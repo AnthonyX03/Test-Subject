@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#050806">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TEST SUBJECT">
+<meta name="description" content="Protocolo de evaluación 09. Experiencia interactiva local de presencia y percepción.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>TEST SUBJECT — Evaluación de presencia</title>
+<style>
+:root{--bg:#050806;--panel:#0a100d;--green:#9cffb1;--dim:#4d8b60;--red:#ff5555;--amber:#d8c58a;--scan-op:.28;--maxw:920px;--pad:20px 16px 34px;--font-scale:1}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--green);font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;font-size:calc(14px * var(--font-scale))}
+body{overflow-x:hidden;background:radial-gradient(ellipse at center,#0a160e 0%,#050806 68%);transition:filter .6s,background 1s}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;z-index:10;background:repeating-linear-gradient(0deg,transparent 0 3px,#0006 4px 5px);opacity:var(--scan-op)}
+body:after{content:"";position:fixed;inset:0;pointer-events:none;z-index:11;box-shadow:inset 0 0 140px #000;opacity:.8}
+.noise{position:fixed;inset:0;z-index:12;pointer-events:none;opacity:0;background:repeating-linear-gradient(90deg,#fff1 0 1px,transparent 1px 4px);mix-blend-mode:screen;transition:opacity .5s}
+.scanline-extra{position:fixed;inset:0;z-index:13;pointer-events:none;opacity:0;background:linear-gradient(transparent 50%,#4cff7212 50%);background-size:100% 5px;animation:scanMove 7s linear infinite}
+.vignette-pulse{position:fixed;inset:0;z-index:9;pointer-events:none;opacity:0;box-shadow:inset 0 0 80px #000;transition:opacity 1s}
+.app{position:relative;z-index:1;max-width:var(--maxw);margin:auto;padding:var(--pad);min-height:100dvh;display:flex;flex-direction:column;gap:14px}
+.topbar{display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid #24452d;padding:8px 0 14px;font-size:11px;letter-spacing:.12em;color:#6fb982}
+.brand{font-weight:900;color:var(--green);letter-spacing:.22em}
+.status{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dot{width:7px;height:7px;border-radius:50%;background:#8aff9c;box-shadow:0 0 10px #8aff9c;display:inline-block;transition:background .3s,box-shadow .3s}
+.icon-btn{font:inherit;font-size:11px;letter-spacing:.08em;color:#76a580;background:transparent;border:1px solid #26472e;padding:6px 10px;cursor:pointer}
+.icon-btn:hover{color:var(--green);border-color:var(--green)}
+.screen{border:1px solid #254d30;background:#050a07e6;box-shadow:0 0 40px #001d0a80;position:relative;padding:clamp(16px,4vw,30px);flex:1;display:flex;flex-direction:column;min-height:580px;transition:border-color .5s,box-shadow .5s}
+.screen:before,.screen:after{content:"";position:absolute;width:12px;height:12px;border-color:var(--dim);border-style:solid;opacity:.8}
+.screen:before{left:-1px;top:-1px;border-width:1px 0 0 1px}
+.screen:after{right:-1px;bottom:-1px;border-width:0 1px 1px 0}
+.intro{margin:auto;width:100%;max-width:620px;text-align:center}
+.sigil{width:112px;height:112px;border:1px solid #38744a;border-radius:50%;margin:0 auto 22px;display:grid;place-items:center;position:relative;box-shadow:0 0 30px #1b6d2a2a}
+.sigil:before,.sigil:after{content:"";position:absolute;border:1px solid #285c36;border-radius:50%;inset:10px}
+.sigil:after{inset:23px;border-radius:0;transform:rotate(45deg)}
+.face{font-size:33px;position:relative;z-index:1;text-shadow:0 0 12px var(--green)}
+h1{font-size:clamp(27px,6vw,44px);letter-spacing:.15em;margin:0 0 12px;text-shadow:0 0 18px #4aff6b55}
+h2{font-size:14px;letter-spacing:.15em;font-weight:500;color:#72b984}
+.sub{font-size:12px;color:#72917a;line-height:1.85;max-width:500px;margin:0 auto 24px}
+.button{background:#0b1b10;color:var(--green);border:1px solid #4d8b60;padding:12px 18px;font:inherit;font-size:12px;letter-spacing:.12em;cursor:pointer;transition:.2s}
+.button:hover,.button:focus-visible{background:#153a20;outline:1px solid var(--green);box-shadow:0 0 20px #42ff6b22}
+.button:disabled{opacity:.35;cursor:not-allowed}
+.controls{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.tiny{font-size:10px;color:#52745b;line-height:1.7;margin-top:20px}
+.game{display:none;flex-direction:column;gap:16px;flex:1}
+.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.metric{border:1px solid #1d3b26;padding:10px;background:#07100a}
+.metric small{display:block;font-size:9px;color:#5f8d69;letter-spacing:.13em;margin-bottom:6px}
+.metric strong{font-size:12px;font-weight:500}
+.bar{height:3px;background:#19301e;margin-top:8px}
+.bar span{display:block;height:100%;width:0;background:var(--green);transition:width .7s}
+.entity{display:flex;align-items:center;gap:18px;padding:14px;border:1px solid #193d25;background:#08110b;min-height:130px}
+.avatar{width:84px;height:84px;flex-shrink:0;border:1px solid #39774a;display:grid;place-items:center;background:#0b1c10;position:relative;overflow:hidden}
+.avatar .eyes{font-size:26px;letter-spacing:4px;transition:.4s}
+.avatar .mouth{position:absolute;bottom:18px;font-size:15px;transition:.4s}
+.avatar:after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 45%,#4cff7210 50%,transparent 55%);animation:scan 4.5s linear infinite}
+.speaker{font-size:10px;color:#75aa80;letter-spacing:.16em;margin-bottom:8px}
+.dialogue{font-size:clamp(13px,2.7vw,15px);line-height:1.85;color:#c0e8c8;white-space:pre-wrap;overflow-wrap:anywhere;min-height:2.6em}
+.transcript{min-height:140px;flex:1;display:flex;flex-direction:column;gap:11px;overflow:hidden}
+.logline{font-size:11px;line-height:1.7;color:#557c5f;border-left:2px solid #24472c;padding-left:10px;animation:fadeIn .4s ease}
+.logline.user{color:#a1bda6;border-color:#6c826f}
+.logline.glitch-text{color:#ff8a8a;border-color:#703030;animation:textGlitch .45s steps(2) 2}
+.logline.whisper{color:#3a5a42;font-style:italic;border-color:#1a2e20}
+.questiontag{font-size:10px;letter-spacing:.15em;color:#638b6b;margin-bottom:-8px}
+.answerarea{border-top:1px solid #1c3a24;padding-top:16px}
+.answerarea label{display:block;font-size:10px;color:#709778;letter-spacing:.13em;margin-bottom:9px}
+.inputrow{display:flex;gap:8px}
+.inputrow input{min-width:0;flex:1;background:#030704;border:1px solid #31553a;color:#d8ffe0;padding:14px;font:inherit;font-size:14px;outline:none}
+.inputrow input:focus{border-color:#92f9a7;box-shadow:0 0 0 1px #92f9a733}
+.inputrow input::placeholder{color:#35573c}
+.foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:9px;color:#45694d;letter-spacing:.08em}
+.utility{display:flex;gap:8px;flex-wrap:wrap}
+.utility button{font:inherit;font-size:10px;color:#76a580;background:transparent;border:1px solid #26472e;padding:8px 10px;cursor:pointer}
+.utility button:hover{color:var(--green);border-color:var(--green)}
+.hidden{display:none!important}
+.glitch{animation:glitch .25s steps(2,end) 3}
+.corrupt{filter:hue-rotate(55deg) contrast(1.28) saturate(1.2)}
+.redmode{--green:#ff7979;--dim:#9b3333;background:radial-gradient(ellipse at center,#1a0707 0%,#050202 72%)}
+.redmode .screen{border-color:#702929;box-shadow:0 0 50px #3a000080}
+.redmode .metric,.redmode .entity{border-color:#512323}
+.redmode .dot{background:#ff4444;box-shadow:0 0 12px #f44}
+.redmode .avatar{border-color:#8a3030}
+.redmode .speaker{color:#c07070}
+.voidmode{--green:#c8c8c8;--dim:#555;background:radial-gradient(ellipse at center,#0c0c0c 0%,#020202 75%);filter:grayscale(.3) contrast(1.15)}
+.voidmode .screen{border-color:#333;box-shadow:0 0 60px #000}
+.voidmode .dot{background:#aaa;box-shadow:0 0 8px #888}
+.ending{margin:auto;text-align:center;max-width:640px;padding:24px 0}
+.ending p{font-size:13px;line-height:2.05;color:#9ebba4}
+.ending .finalcode{font-size:10px;letter-spacing:.2em;color:#4f7a59;margin:24px 0}
+.ending h2{font-size:22px;color:var(--green);letter-spacing:.08em;margin-bottom:18px}
+.warning{color:#ff7676!important}
+.flash{position:fixed;inset:0;background:#e8ffe8;z-index:20;pointer-events:none;opacity:0}
+.flash.on{animation:flash .2s ease-out}
+.flash.red{background:#ff2020}
+.flash.dark{background:#000}
+.sysmsg{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#0a120c;border:1px solid #2a4a32;padding:11px 20px;font-size:11px;letter-spacing:.1em;color:#7ab88a;z-index:30;opacity:0;pointer-events:none;transition:opacity .45s;max-width:92vw;text-align:center}
+.sysmsg.show{opacity:1}
+.sysmsg.danger{border-color:#6a2020;color:#ff9090;background:#120808}
+.typing-indicator{display:none;font-size:11px;color:#4a6a52;letter-spacing:.12em;padding:4px 0;animation:blink 1.2s ease infinite}
+.typing-indicator.show{display:block}
+.modal-bg{position:fixed;inset:0;background:#000c;z-index:40;display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:opacity .25s}
+.modal-bg.open{opacity:1;pointer-events:auto}
+.modal{background:#0a100d;border:1px solid #2a4a32;max-width:440px;width:100%;max-height:88dvh;overflow:auto;padding:22px 20px;box-shadow:0 0 40px #001a0a}
+.modal h3{margin:0 0 16px;font-size:14px;letter-spacing:.18em;color:var(--green);border-bottom:1px solid #1d3b26;padding-bottom:10px}
+.modal section{margin-bottom:18px}
+.modal section h4{margin:0 0 8px;font-size:10px;letter-spacing:.14em;color:#5f8d69;font-weight:500}
+.modal .row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.modal label.opt{display:flex;align-items:center;gap:8px;font-size:12px;color:#9ebba4;cursor:pointer;padding:8px 10px;border:1px solid #1d3b26;background:#07100a;flex:1;min-width:110px}
+.modal label.opt input{accent-color:var(--green)}
+.modal label.opt.active{border-color:#4d8b60;color:var(--green)}
+.modal .hint{font-size:10px;color:#52745b;line-height:1.5;margin-top:6px}
+.modal .ending-list{display:flex;flex-direction:column;gap:8px;max-height:220px;overflow:auto}
+.modal .ending-item{border:1px solid #1d3b26;padding:10px 12px;font-size:11px;line-height:1.5;background:#07100a;color:#6a8a72}
+.modal .ending-item.unlocked{border-color:#3a6a45;color:#b0d4b8}
+.modal .ending-item .etitle{letter-spacing:.1em;margin-bottom:4px;font-weight:600}
+.modal .ending-item.locked{opacity:.45}
+.modal .close-row{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+body.layout-mobile{--maxw:100%;--pad:10px 8px 20px;--font-scale:1.05}
+body.layout-mobile .hud{grid-template-columns:1fr 1fr}
+body.layout-mobile .metric:last-child{grid-column:span 2}
+body.layout-mobile .inputrow{flex-direction:column}
+body.layout-mobile .inputrow .button{width:100%}
+body.layout-mobile .entity{gap:10px;padding:10px}
+body.layout-mobile .avatar{width:64px;height:68px}
+body.layout-pc{--maxw:960px;--pad:24px 20px 40px;--font-scale:1}
+@keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
+@keyframes scanMove{0%{background-position:0 0}100%{background-position:0 100%}}
+@keyframes glitch{0%{transform:translate(0)}20%{transform:translate(-4px,1px)}40%{transform:translate(4px,-2px)}60%{transform:translate(-2px,2px)}80%{transform:translate(3px,-1px)}100%{transform:translate(0)}}
+@keyframes flash{0%{opacity:.7}100%{opacity:0}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes textGlitch{0%{transform:translate(0);opacity:1}25%{transform:translate(-2px,1px);opacity:.65}50%{transform:translate(3px,-1px)}75%{transform:translate(-1px,2px);opacity:.8}100%{transform:none;opacity:1}}
+@keyframes blink{0%,100%{opacity:.35}50%{opacity:1}}
+@media(max-width:560px){
+body:not(.layout-pc){--maxw:100%;--pad:10px 8px 18px}
+body:not(.layout-pc) .screen{min-height:calc(100dvh - 100px);padding:14px}
+body:not(.layout-pc) .hud{grid-template-columns:1fr 1fr}
+body:not(.layout-pc) .metric:last-child{grid-column:span 2}
+body:not(.layout-pc) .inputrow{flex-direction:column}
+body:not(.layout-pc) .inputrow .button{width:100%}
+body:not(.layout-pc) .topbar{font-size:9px}
+}
+</style>
+</head>
+<body>
+<div class="noise" id="noise"></div>
+<div class="scanline-extra" id="scanExtra"></div>
+<div class="vignette-pulse" id="vignette"></div>
+<div class="flash" id="flash"></div>
+<div class="sysmsg" id="sysmsg"></div>
+
+<div class="modal-bg" id="settingsModal" role="dialog" aria-modal="true" aria-label="Ajustes">
+  <div class="modal">
+    <h3>◈ AJUSTES</h3>
+    <section>
+      <h4>SONIDO</h4>
+      <div class="row">
+        <label class="opt" id="optSoundOn"><input type="radio" name="snd" value="on"> ACTIVADO</label>
+        <label class="opt" id="optSoundOff"><input type="radio" name="snd" value="off"> DESACTIVADO</label>
+      </div>
+      <p class="hint">El audio solo suena cuando lo activas. Recomendado con auriculares.</p>
+    </section>
+    <section>
+      <h4>ADAPTABILIDAD</h4>
+      <div class="row">
+        <label class="opt" id="optLayoutAuto"><input type="radio" name="lay" value="auto"> AUTOMÁTICO</label>
+        <label class="opt" id="optLayoutMobile"><input type="radio" name="lay" value="mobile"> MODO MÓVIL</label>
+        <label class="opt" id="optLayoutPc"><input type="radio" name="lay" value="pc"> MODO PC</label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button type="button" class="button" id="fullscreenBtn">PANTALLA COMPLETA (PC)</button>
+      </div>
+      <p class="hint">Cambia el tamaño de la interfaz. Pantalla completa recomendada en PC.</p>
+    </section>
+    <section>
+      <h4>PARTIDA</h4>
+      <div class="row">
+        <button type="button" class="button" id="exportBtn">EXPORTAR PARTIDA</button>
+        <button type="button" class="button" id="importBtn">IMPORTAR PARTIDA</button>
+      </div>
+      <input type="file" id="importFile" accept="application/json,.json" class="hidden">
+      <p class="hint">Exporta finales descubiertos, memoria entre partidas y ajustes. Todo es local.</p>
+    </section>
+    <section>
+      <h4>FINALES DESCUBIERTOS <span id="endingCount">(0/5)</span></h4>
+      <div class="ending-list" id="endingList"></div>
+      <p class="hint">Se desbloquean al terminar. Cada estilo de respuesta puede llevar a uno distinto.</p>
+    </section>
+    <div class="close-row">
+      <button type="button" class="button" id="settingsClose">CERRAR</button>
+    </div>
+  </div>
+</div>
+
+<main class="app">
+  <header class="topbar">
+    <div class="brand">◈ TEST SUBJECT</div>
+    <div class="status">
+      <button type="button" class="icon-btn" id="settingsOpen" title="Ajustes">⚙ AJUSTES</button>
+      <span class="dot" id="dot"></span>
+      <span id="systemStatus">SISTEMA ESTABLE</span>
+    </div>
+  </header>
+
+  <section class="screen" id="screen">
+    <div class="intro" id="intro">
+      <div class="sigil"><div class="face" id="introFace">◡</div></div>
+      <h1>TEST SUBJECT</h1>
+      <h2>PROTOCOLO DE EVALUACIÓN 09</h2>
+      <p class="sub">
+        Bienvenido. Esta evaluación nos ayuda a comprender cómo piensas,
+        cómo recuerdas y cómo interpretas lo que te rodea.
+        No hay respuestas incorrectas. Tómate tu tiempo.
+        <br><br>
+        <span style="color:#4a6a52;font-size:11px">Las respuestas no salen de este dispositivo. Cada partida elige preguntas distintas de un banco amplio (+1000 variantes).</span>
+      </p>
+      <div class="controls">
+        <button class="button" id="startBtn">INICIAR EVALUACIÓN →</button>
+        <button class="button" id="settingsOpen2">⚙ AJUSTES</button>
+      </div>
+      <p class="tiny" id="introMeta">
+        DURACIÓN EST. 12–18 MIN · 20 PREGUNTAS · BANCO VARIABLE<br>
+        Escape pausa la sesión. Puedes exportar tu progreso en Ajustes.
+      </p>
+    </div>
+
+    <div class="game" id="game">
+      <div class="hud">
+        <div class="metric"><small>ESTADO DEL SISTEMA</small><strong id="sysValue">NORMAL</strong><div class="bar"><span id="sysBar"></span></div></div>
+        <div class="metric"><small>FASE DE EVALUACIÓN</small><strong id="phaseValue">01 / 20</strong><div class="bar"><span id="phaseBar"></span></div></div>
+        <div class="metric"><small>HORA LOCAL</small><strong id="clock">--:--:--</strong><div class="bar"><span id="timeBar"></span></div></div>
+      </div>
+      <div class="entity">
+        <div class="avatar" id="avatar"><span class="eyes" id="eyes">• •</span><span class="mouth" id="mouth">﹀</span></div>
+        <div style="flex:1;min-width:0">
+          <div class="speaker" id="speaker">ENTREVISTADOR // UNIDAD 04</div>
+          <div class="dialogue" id="dialogue" aria-live="polite">Preparando la sesión...</div>
+          <div class="typing-indicator" id="typingInd">UNIDAD 04 está procesando…</div>
+        </div>
+      </div>
+      <div class="transcript" id="transcript" aria-live="polite"></div>
+      <div class="questiontag" id="questiontag">PREGUNTA 01 · RESPUESTA LIBRE</div>
+      <form class="answerarea" id="answerForm">
+        <label for="answer">TU RESPUESTA <span id="inputHint">— ESCRIBE CON TUS PROPIAS PALABRAS</span></label>
+        <div class="inputrow">
+          <input id="answer" name="answer" autocomplete="off" maxlength="360" placeholder="Escribe aquí..." required>
+          <button class="button" id="sendBtn" type="submit">ENVIAR ↵</button>
+        </div>
+      </form>
+      <div class="foot">
+        <span id="footLeft">CONEXIÓN SEGURA · SESIÓN LOCAL</span>
+        <div class="utility">
+          <button type="button" id="soundToggle">♫ AUDIO: OFF</button>
+          <button type="button" id="settingsOpen3">⚙ AJUSTES</button>
+          <button type="button" id="restartBtn">REINICIAR</button>
+        </div>
+        <span id="footRight">MEMORIA: VACÍA</span>
+      </div>
+    </div>
+
+    <div class="ending hidden" id="ending">
+      <div class="sigil"><div class="face" id="endFace">◉</div></div>
+      <h2 id="endingTitle">EVALUACIÓN COMPLETADA</h2>
+      <p id="endingText"></p>
+      <div class="finalcode" id="finalCode">ARCHIVO CERRADO // 000</div>
+      <div class="controls" style="margin-top:12px">
+        <button class="button" id="againBtn">VOLVER A EMPEZAR ↻</button>
+        <button class="button" id="settingsOpen4">⚙ FINALES</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>ARCHIVO: TS-09 / BUILD 4.0</span>
+    <span id="footerHint">NO TODAS LAS PREGUNTAS SON PARA TI.</span>
+  </footer>
+</main>
+
+<script src="js/questions.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
