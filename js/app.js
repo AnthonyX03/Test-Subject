@@ -1017,8 +1017,11 @@ function reset() {
   if (fh) fh.textContent = 'NO TODAS LAS PREGUNTAS SON PARA TI.';
   const sm = $('sysmsg'); if (sm) sm.classList.remove('show');
   const ti = $('typingInd'); if (ti) ti.classList.remove('show');
-  if (audioOn) playTrack('calm');
-  else stopAllMusic();
+  if (audioOn) {
+    music.unlocked = true;
+    stopAllMusic();
+    playTrack('calm');
+  } else stopAllMusic();
   refreshIntroMeta();
 }
 
@@ -1032,14 +1035,18 @@ function refreshIntroMeta() {
 }
 
 
+function openClearConfirm() {
+  const modal = $('clearConfirmModal');
+  if (modal) modal.classList.add('open');
+}
+function closeClearConfirm() {
+  const modal = $('clearConfirmModal');
+  if (modal) modal.classList.remove('open');
+}
 async function clearMemoryAndCache() {
-  const ok = window.confirm(
-    '¿Borrar toda la memoria local, finales descubiertos, ajustes y caché?\n\nLa página se reiniciará. Esta acción no se puede deshacer.'
-  );
-  if (!ok) return;
+  closeClearConfirm();
   try {
     localStorage.removeItem(STORAGE_KEY);
-    // Otras claves antiguas por si acaso
     Object.keys(localStorage).forEach(k => {
       if (k.indexOf('ts09') === 0 || k.indexOf('test_subject') === 0) {
         try { localStorage.removeItem(k); } catch (e) {}
@@ -1058,12 +1065,10 @@ async function clearMemoryAndCache() {
       await Promise.all(regs.map(r => r.unregister()));
     }
   } catch (e) {}
-  // Hard reload bypassing cache
-  try {
-    window.location.reload(true);
-  } catch (e) {
-    window.location.href = window.location.href.split('#')[0] + (window.location.search ? '' : '') + '?t=' + Date.now();
-  }
+  saveData = defaultSave();
+  persist();
+  reset();
+  showSysMsg('MEMORIA Y CACHÉ BORRADAS', 3500, false);
 }
 
 function wireUI() {
@@ -1091,7 +1096,11 @@ function wireUI() {
   on($('restartBtn'), 'click', reset);
   on($('againBtn'), 'click', reset);
 
-  on($('clearMemoryBtn'), 'click', () => { clearMemoryAndCache(); });
+  on($('clearMemoryBtn'), 'click', openClearConfirm);
+  on($('cancelClearBtn'), 'click', closeClearConfirm);
+  on($('confirmClearBtn'), 'click', clearMemoryAndCache);
+  on($('clearConfirmModal'), 'click', e => { if (e.target === $('clearConfirmModal')) closeClearConfirm(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeClearConfirm(); });
   on($('exportBtn'), 'click', () => {
     const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
