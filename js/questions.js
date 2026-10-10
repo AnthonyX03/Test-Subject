@@ -136,6 +136,9 @@
     const names = past.names || [];
     const trusts = past.trusts || [];
     const secrets = past.secrets || [];
+    const wakes = past.wakes || [];
+    const safes = past.safes || [];
+    const answers = past.answers || []; // [{key,q,answer,phase}]
     const plays = past.playCount || 0;
 
     if (names.length) {
@@ -169,15 +172,55 @@
       });
     }
     if (secrets.length && plays > 1) {
+      const s = secrets[secrets.length - 1];
+      const snip = s.length > 40 ? s.slice(0, 40) + '…' : s;
       hooks.push({
         phase: 4,
-        q: 'En otra partida dejaste algo que no querías decir en voz alta. ¿Crees que aún está aquí, en algún rincón del archivo?',
+        q: 'En otra partida dejaste algo que no querías decir en voz alta. Empezaba más o menos así: «' + snip + '». ¿Crees que aún está aquí?',
         tag: 'RESIDUO',
         key: 'echo_secret',
         normal: 'Los archivos locales se borran. En teoría.',
-        strange: 'No puedo mostrártelo. Pero sí puedo preguntarte si lo recuerdas tú.'
+        strange: 'No puedo mostrártelo entero. Pero sí puedo preguntarte si lo recuerdas tú.'
       });
     }
+    if (wakes.length) {
+      const w = wakes[wakes.length - 1];
+      const ws = w.length > 35 ? w.slice(0, 35) + '…' : w;
+      hooks.push({
+        phase: 2,
+        q: 'Antes dijiste que lo primero al despertar era algo como «' + ws + '». ¿Sigue siendo verdad?',
+        tag: 'ECO // RUTINA',
+        key: 'echo_wake',
+        normal: 'Las rutinas cambian. O se aferran.',
+        strange: 'Lo guardé. Aunque el protocolo dice que no debería.'
+      });
+    }
+    if (safes.length) {
+      const sf = safes[safes.length - 1];
+      const ss = sf.length > 35 ? sf.slice(0, 35) + '…' : sf;
+      hooks.push({
+        phase: 3,
+        q: 'Hablaste de un lugar seguro. Mencionaste «' + ss + '». ¿Todavía te sientes a salvo ahí?',
+        tag: 'ECO // LUGAR',
+        key: 'echo_safe',
+        normal: 'Los refugios mentales a veces se mudan.',
+        strange: 'Espero que siga existiendo. Por ti. O por lo que queda de ti aquí.'
+      });
+    }
+    // Generic past answers
+    const usable = answers.filter(x => x && x.answer && x.key && x.key !== 'name').slice(-6);
+    usable.forEach((item, i) => {
+      const snip = item.answer.length > 42 ? item.answer.slice(0, 42) + '…' : item.answer;
+      const ph = Math.min(4, Math.max(2, (item.phase || 2)));
+      hooks.push({
+        phase: ph,
+        q: 'Antes me dijiste: «' + snip + '». ¿Lo mantienes, o era solo para salir del paso?',
+        tag: 'ECO // RESPUESTA',
+        key: 'echo_ans_' + i,
+        normal: 'Las respuestas anteriores pesan más de lo que parece.',
+        strange: 'Lo escribiste tú. Yo solo lo devuelvo. ¿Duele o alivia?'
+      });
+    });
     if (plays >= 3) {
       hooks.push({
         phase: 4,
@@ -185,7 +228,7 @@
         tag: 'REINCIDENCIA',
         key: 'echo_plays',
         normal: 'La curiosidad es un motivo válido.',
-        strange: 'Volver es una forma de admitir que la primera vez no fue suficiente… o que algo te dejó a medias.'
+        strange: 'Volver es admitir que la primera vez no fue suficiente… o que algo te dejó a medias.'
       });
     }
     if (plays >= 1) {
@@ -291,13 +334,16 @@
     const pool = buildPool(pastMemories);
     const total = countPool(pool);
     const usedQ = new Set();
+    const usedKeys = new Set(['name']); // name forced later
+    // Evitar preguntas literales de partidas recientes
+    const recentTexts = (pastMemories && pastMemories.recentQuestions) || [];
+    recentTexts.forEach(t => { if (t) usedQ.add(t); });
+
     const picks = [];
-    // Distribution: 4 / 5 / 5 / 6 for 20
     const dist = [4, 5, 5, 6];
     [1, 2, 3, 4].forEach((ph, i) => {
       const need = dist[i];
       const arr = (pool[ph] || []).slice();
-      // shuffle
       for (let j = arr.length - 1; j > 0; j--) {
         const k = Math.floor(Math.random() * (j + 1));
         const tmp = arr[j]; arr[j] = arr[k]; arr[k] = tmp;
@@ -306,19 +352,15 @@
       for (let n = 0; n < arr.length && added < need; n++) {
         const item = arr[n];
         if (usedQ.has(item.q)) continue;
+        if (item.key && usedKeys.has(item.key)) continue;
         usedQ.add(item.q);
-        // fill default replies
-        if (!item.normal) {
-          item.normal = REPLIES.default_normal[Math.floor(Math.random() * REPLIES.default_normal.length)];
-        }
-        if (!item.strange) {
-          item.strange = REPLIES.default_strange[Math.floor(Math.random() * REPLIES.default_strange.length)];
-        }
+        if (item.key) usedKeys.add(item.key);
+        if (!item.normal) item.normal = REPLIES.default_normal[Math.floor(Math.random() * REPLIES.default_normal.length)];
+        if (!item.strange) item.strange = REPLIES.default_strange[Math.floor(Math.random() * REPLIES.default_strange.length)];
         picks.push(item);
         added++;
       }
     });
-    // if short, fill from any phase
     if (picks.length < count) {
       const all = [];
       [1, 2, 3, 4].forEach(ph => (pool[ph] || []).forEach(x => all.push(x)));
@@ -328,14 +370,16 @@
       }
       for (let n = 0; n < all.length && picks.length < count; n++) {
         if (usedQ.has(all[n].q)) continue;
+        if (all[n].key && usedKeys.has(all[n].key)) continue;
         usedQ.add(all[n].q);
+        if (all[n].key) usedKeys.add(all[n].key);
         const item = all[n];
         if (!item.normal) item.normal = REPLIES.default_normal[0];
         if (!item.strange) item.strange = REPLIES.default_strange[0];
         picks.push(item);
       }
     }
-    // Siempre primera pregunta = nombre (identidad)
+
     const nameQ = {
       q: 'Para empezar, algo sencillo. ¿Cómo te gustaría que te llamara durante esta sesión?',
       tag: 'IDENTIDAD',
@@ -344,11 +388,51 @@
       normal: 'Gracias. Es más fácil conversar cuando sabemos cómo dirigirnos a alguien.',
       strange: 'Ese nombre queda registrado. Aunque no estoy seguro de que sea el que usas cuando nadie te oye.'
     };
-    // Quitar cualquier otra pregunta de nombre/identidad del resto
     let rest = picks.filter(p => p.key !== 'name' && p.tag !== 'IDENTIDAD');
-    // Reconstruir: nombre + resto hasta count
-    const final = [nameQ].concat(rest).slice(0, count);
-    // Asegurar fases coherentes en orden (ya vienen por fase)
+    // Deduplicar por texto otra vez
+    const seen = new Set();
+    rest = rest.filter(p => {
+      if (seen.has(p.q)) return false;
+      seen.add(p.q);
+      return true;
+    });
+    let final = [nameQ].concat(rest);
+    // Inyectar 1–2 ecos de partidas anteriores si hay memoria
+    const hooks = memoryHooks(pastMemories || {}).filter(h => h.key !== 'name');
+    if (hooks.length) {
+      for (let j = hooks.length - 1; j > 0; j--) {
+        const k = Math.floor(Math.random() * (j + 1));
+        const tmp = hooks[j]; hooks[j] = hooks[k]; hooks[k] = tmp;
+      }
+      const inject = hooks.slice(0, Math.min(2, hooks.length));
+      // Insertar en posiciones de su fase (no al inicio)
+      inject.forEach(h => {
+        if (!h.normal) h.normal = REPLIES.default_normal[0];
+        if (!h.strange) h.strange = REPLIES.default_strange[0];
+        // quitar un hueco del final para no pasar de count
+        if (final.length >= count) final.pop();
+        // colocar tras el bloque de su fase aproximada
+        let pos = 1;
+        for (let i = 1; i < final.length; i++) {
+          if ((final[i].phase || 1) >= h.phase) { pos = i; break; }
+          pos = i + 1;
+        }
+        final.splice(pos, 0, h);
+      });
+    }
+    // Dedup final por texto y key
+    const seenF = new Set(['name']);
+    const seenT = new Set();
+    final = final.filter(p => {
+      if (seenT.has(p.q)) return false;
+      if (p.key && p.key !== 'name' && seenF.has(p.key)) return false;
+      seenT.add(p.q);
+      if (p.key) seenF.add(p.key);
+      return true;
+    });
+    final = final.slice(0, count);
+    // Re-asegurar nombre primero
+    final = [nameQ].concat(final.filter(p => p.key !== 'name')).slice(0, count);
     return { questions: final, poolSize: total };
   }
 

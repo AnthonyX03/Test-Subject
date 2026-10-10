@@ -104,7 +104,7 @@ function defaultSave() {
     version: 4,
     playCount: 0,
     discoveredEndings: [],
-    past: { names: [], trusts: [], secrets: [], wakes: [] },
+    past: { names: [], trusts: [], secrets: [], wakes: [], safes: [], answers: [], recentQuestions: [] },
     settings: { sound: true, layout: 'auto' }
   };
 }
@@ -533,6 +533,29 @@ function responseFor(q, answer) {
   if (q.key === 'echo_name' || q.key === 'echo_name2') {
     return withTone(q.strange || 'Ese nombre ya estuvo aquí.', 'uneasy');
   }
+  if (q.key === 'echo_wake') {
+    return withTone(q.strange || 'Las rutinas dejan huella en el registro.', 'curious');
+  }
+  if (q.key === 'echo_safe') {
+    return withTone(q.strange || 'Espero que ese lugar siga existiendo.', 'melancholy');
+  }
+  if (q.key && String(q.key).indexOf('echo_ans_') === 0) {
+    return withTone(q.strange || 'Antes me lo dijiste. Ahora lo devuelvo.', 'uneasy');
+  }
+
+  // Referencias espontáneas a respuestas de partidas anteriores
+  const pastAns = (saveData.past && saveData.past.answers) || [];
+  if (pastAns.length && phase >= 2 && Math.random() < 0.28) {
+    const prev = pastAns[Math.floor(Math.random() * pastAns.length)];
+    if (prev && prev.answer) {
+      const snip = prev.answer.length > 36 ? prev.answer.slice(0, 36) + '…' : prev.answer;
+      if (phase >= 3) {
+        return withTone('Antes me dijiste «' + snip + '». Y ahora escribes «' + short + '». El registro no olvida tan fácil como tú.', 'uneasy');
+      }
+      return withTone('Me suena… en otra sesión dijiste algo parecido: «' + snip + '». ¿Casualidad?', 'curious');
+    }
+  }
+
 
   // Emotional flavor lines by phase
   const warmBits = [
@@ -613,6 +636,15 @@ function maybeRandomEvent() {
     () => { document.body.classList.add('glitch'); setTimeout(() => document.body.classList.remove('glitch'), 700); sound('glitch'); },
     () => { const n = $('noise'); if (n) n.style.opacity = String(Math.min(0.4, 0.1 + idx * 0.02)); sound('low'); },
     () => { if (memory.name) { addLine(memory.name + '… ¿sigues usando ese nombre aquí?', 'system', 'whisper'); sound('tick'); } },
+    () => {
+      const pa = (saveData.past && saveData.past.answers) || [];
+      if (!pa.length) return;
+      const prev = pa[Math.floor(Math.random() * pa.length)];
+      if (!prev || !prev.answer) return;
+      const snip = prev.answer.length > 40 ? prev.answer.slice(0, 40) + '…' : prev.answer;
+      addLine('Antes escribiste: «' + snip + '». ¿Lo recuerdas?', 'system', 'whisper');
+      sound('low');
+    },
     () => { showSysMsg('REGISTRO TEMPORAL CORRUPTO · REINTENTANDO…', 2600); sound('hum'); },
     () => {
       const eyes = $('eyes'); if (!eyes) return;
@@ -658,11 +690,25 @@ function begin() {
 async function runIntroThenQuestions() {
   const lines = [
     { t: 'SESIÓN ABIERTA.', d: 600 },
-    { t: 'Hola. Soy la unidad de entrevista 04. Estaré contigo durante esta evaluación.', d: 2200 },
-    { t: 'No medimos inteligencia ni velocidad. Solo escuchamos lo que decides escribir.', d: 2400 },
-    { t: 'Puedes usar frases cortas o largas. Si en algún momento quieres parar, cierra la página. Nadie te retiene.', d: 2600 },
-    { t: 'Cuando estés listo… empezamos por lo sencillo.', d: 1800 }
+    { t: 'Hola. Soy la unidad de entrevista 04. Estaré contigo durante esta evaluación.', d: 2200 }
   ];
+  if (saveData.playCount > 0) {
+    const lastName = (saveData.past.names || []).slice(-1)[0];
+    lines.push({
+      t: lastName
+        ? ('Has vuelto. La última vez te llamabas «' + lastName + '»… o al menos eso escribiste.')
+        : ('Has vuelto. El registro aún guarda ecos de la sesión anterior.'),
+      d: 2600
+    });
+    lines.push({
+      t: 'No prometo olvidar todo lo que dijiste. El protocolo dice que debería. Yo… a veces fallo.',
+      d: 2500
+    });
+  } else {
+    lines.push({ t: 'No medimos inteligencia ni velocidad. Solo escuchamos lo que decides escribir.', d: 2400 });
+  }
+  lines.push({ t: 'Puedes usar frases cortas o largas. Si en algún momento quieres parar, cierra la página. Nadie te retiene.', d: 2600 });
+  lines.push({ t: 'Cuando estés listo… empezamos por lo sencillo.', d: 1800 });
   const dlg = $('dialogue');
   for (const line of lines) {
     if (!started) return;
@@ -862,10 +908,28 @@ function finish() {
   if (dot) { dot.style.background = '#ff5555'; dot.style.boxShadow = '0 0 12px #ff5555'; }
 
   saveData.playCount = (saveData.playCount || 0) + 1;
+  if (!saveData.past) saveData.past = {};
   if (memory.name) saveData.past.names = (saveData.past.names || []).concat([memory.name]).slice(-8);
   if (memory.trust) saveData.past.trusts = (saveData.past.trusts || []).concat([memory.trust]).slice(-8);
   if (memory.secret) saveData.past.secrets = (saveData.past.secrets || []).concat([String(memory.secret).slice(0, 80)]).slice(-5);
   if (memory.wake) saveData.past.wakes = (saveData.past.wakes || []).concat([memory.wake]).slice(-5);
+  if (memory.safe) saveData.past.safes = (saveData.past.safes || []).concat([String(memory.safe).slice(0, 80)]).slice(-5);
+  // Guardar respuestas clave de esta partida
+  const packed = [];
+  questions.forEach((qq, i) => {
+    if (answers[i] && qq) {
+      packed.push({
+        key: qq.key || null,
+        q: String(qq.q || '').slice(0, 120),
+        answer: String(answers[i]).slice(0, 120),
+        phase: qq.phase || 1
+      });
+    }
+  });
+  saveData.past.answers = (saveData.past.answers || []).concat(packed).slice(-24);
+  // Textos de preguntas usadas (evitar repetición entre partidas cercanas)
+  const usedTexts = questions.map(qq => qq && qq.q).filter(Boolean);
+  saveData.past.recentQuestions = (saveData.past.recentQuestions || []).concat(usedTexts).slice(-60);
 
   const code = String(
     Math.abs(answers.join('').split('').reduce((a, c) => a + c.charCodeAt(0), 0))
