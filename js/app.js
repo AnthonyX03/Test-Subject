@@ -64,26 +64,31 @@ function fadeVolume(audio, to, ms) {
 }
 
 async function playTrack(which) {
-  if (!audioOn || !music.unlocked) return;
+  if (!audioOn) return false;
   const next = which === 'horror' ? music.horror : music.calm;
+  if (!next) return false;
   const prev = music.current;
-  if (!next) return;
-  if (prev === next && !prev.paused) return;
+  if (prev === next && !next.paused) return true;
+  // Only fade out the previous track after the browser has accepted playback
+  // of the new track. A rejected autoplay attempt must remain retryable.
   try {
-    if (prev && prev !== next && !prev.paused) {
-      await fadeVolume(prev, 0, 600);
-      prev.pause();
-      prev.currentTime = 0;
-    }
-    if (which === 'horror' && prev && prev !== next) {
-      await new Promise(r => setTimeout(r, 700));
-    }
-    next.volume = 0;
+    next.volume = which === 'horror' ? 0.6 : 0.55;
+    const playPromise = next.play();
+    if (playPromise && typeof playPromise.then === 'function') await playPromise;
+    music.unlocked = true;
     music.current = next;
-    const p = next.play();
-    if (p && p.catch) p.catch(() => {});
-    await fadeVolume(next, which === 'horror' ? 0.6 : 0.55, 900);
-  } catch (e) {}
+    if (prev && prev !== next) {
+      await fadeVolume(prev, 0, 450);
+      prev.pause();
+      try { prev.currentTime = 0; } catch (e) {}
+      await fadeVolume(next, which === 'horror' ? 0.6 : 0.55, 250);
+    }
+    return true;
+  } catch (e) {
+    // Autoplay may be blocked until a genuine user gesture. Do not mark this
+    // track as current; the next gesture can retry it normally.
+    return false;
+  }
 }
 
 function stopAllMusic() {
@@ -1018,9 +1023,8 @@ function reset() {
   const sm = $('sysmsg'); if (sm) sm.classList.remove('show');
   const ti = $('typingInd'); if (ti) ti.classList.remove('show');
   if (audioOn) {
-    music.unlocked = true;
-    stopAllMusic();
-    playTrack('calm');
+    // Keep the audio element alive across a reset; only switch tracks if needed.
+    if (music.current !== music.calm || music.calm.paused) playTrack('calm');
   } else stopAllMusic();
   refreshIntroMeta();
 }
@@ -1045,6 +1049,10 @@ function closeClearConfirm() {
 }
 async function clearMemoryAndCache() {
   closeClearConfirm();
+  // Remember the active track and its playback position before clearing data.
+  const activeTrack = music.current;
+  const wasPlaying = !!(activeTrack && !activeTrack.paused && audioOn);
+  const savedTime = activeTrack ? activeTrack.currentTime : 0;
   try {
     localStorage.removeItem(STORAGE_KEY);
     Object.keys(localStorage).forEach(k => {
@@ -1053,21 +1061,34 @@ async function clearMemoryAndCache() {
       }
     });
   } catch (e) {}
+  // Delete this app's offline caches only. Do not unregister the service worker
+  // or interrupt the live audio elements; either can make playback flaky mid-session.
   try {
     if ('caches' in window) {
       const keys = await caches.keys();
-      await Promise.all(keys.map(k => caches.delete(k)));
-    }
-  } catch (e) {}
-  try {
-    if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map(r => r.unregister()));
+      await Promise.all(keys.filter(k => /^ts-09/i.test(k)).map(k => caches.delete(k)));
     }
   } catch (e) {}
   saveData = defaultSave();
+  // Keep the user's current sound preference for this live session.
+  saveData.settings.sound = audioOn;
   persist();
   reset();
+  if (audioOn) {
+    music.unlocked = true;
+    const target = started && (horrorMusicStarted || unsettling >= 5 || idx >= 8) ? 'horror' : 'calm';
+    const track = music[target] || music.calm;
+    if (track) {
+      if (activeTrack && activeTrack !== track && !activeTrack.paused) {
+        try { activeTrack.pause(); } catch (e) {}
+      }
+      music.current = track;
+      if (wasPlaying || track.paused) {
+        try { if (Number.isFinite(savedTime) && activeTrack === track) track.currentTime = savedTime; } catch (e) {}
+        try { const p = track.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+      }
+    }
+  }
   showSysMsg('MEMORIA Y CACHÉ BORRADAS', 3500, false);
 }
 
@@ -1165,9 +1186,19 @@ if (st) st.textContent = '♫ AUDIO: ' + (audioOn ? 'ON' : 'OFF');
 updateSettingsUI();
 refreshIntroMeta();
 
-document.addEventListener('click', function once() {
-  if (audioOn && !music.unlocked) unlockAndStartCalm();
-}, true);
+function resumeMusicFromGesture() {
+  if (!audioOn) return;
+  music.unlocked = true;
+  const wanted = started && (horrorMusicStarted || unsettling >= 5 || idx >= 8) ? 'horror' : 'calm';
+  const current = music[wanted];
+  if (!current || current.paused) playTrack(wanted);
+}
+// Browsers commonly block autoplay on page load. Try immediately, then retry
+// on the first genuine interaction without requiring the user to toggle audio.
+if (audioOn) playTrack('calm');
+['pointerdown', 'keydown', 'touchstart', 'click'].forEach(type => {
+  document.addEventListener(type, resumeMusicFromGesture, { capture: true, passive: true });
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
