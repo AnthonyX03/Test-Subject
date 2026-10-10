@@ -37,8 +37,10 @@ const music = { calm: null, horror: null, current: null, unlocked: false };
 
 function initMusic() {
   try {
-    music.calm = new Audio('audio/TEST.mp3');
-    music.horror = new Audio('audio/TESTHORROR.mp3');
+    // URLs relativas al directorio de la web: funcionan también en GitHub Pages
+    // cuando el proyecto se publica dentro de un subdirectorio.
+    music.calm = new Audio(new URL('./audio/TEST.mp3', document.baseURI).href);
+    music.horror = new Audio(new URL('./audio/TESTHORROR.mp3', document.baseURI).href);
     music.calm.loop = true;
     music.horror.loop = true;
     music.calm.volume = 0.55;
@@ -1120,9 +1122,22 @@ if (st) st.textContent = '♫ AUDIO: ' + (audioOn ? 'ON' : 'OFF');
 updateSettingsUI();
 refreshIntroMeta();
 
-document.addEventListener('click', function once() {
+// Los navegadores bloquean el autoplay con sonido hasta que el usuario
+// interactúa. Desbloqueamos la música con la primera interacción en cualquier
+// parte de la página, no solamente al abrir Ajustes.
+function unlockAudioFromInteraction() {
   if (audioOn && !music.unlocked) unlockAndStartCalm();
-}, true);
+  if (music.unlocked) {
+    document.removeEventListener('pointerdown', unlockAudioFromInteraction, true);
+    document.removeEventListener('touchstart', unlockAudioFromInteraction, true);
+    document.removeEventListener('keydown', unlockAudioFromInteraction, true);
+    document.removeEventListener('click', unlockAudioFromInteraction, true);
+  }
+}
+document.addEventListener('pointerdown', unlockAudioFromInteraction, true);
+document.addEventListener('touchstart', unlockAudioFromInteraction, true);
+document.addEventListener('keydown', unlockAudioFromInteraction, true);
+document.addEventListener('click', unlockAudioFromInteraction, true);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
