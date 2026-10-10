@@ -172,10 +172,13 @@ body:not(.layout-pc) .topbar{font-size:9px}
 .speaker.tone-uneasy{color:#a0a060}
 .speaker.tone-warm{color:#7aba80}
 
+
+/* Versión discreta en la esquina inferior derecha */
+.version-label{position:fixed;right:10px;bottom:8px;z-index:12;color:#45694d;font-size:10px;letter-spacing:.12em;opacity:.8;pointer-events:none}
 </style>
 </head>
 <body>
-<div class="noise" id="noise"></div>
+<div class="version-label" aria-label="Versión 1.0">VERSION 1.0</div>\n<div class="noise" id="noise"></div>
 <div class="scanline-extra" id="scanExtra"></div>
 <div class="vignette-pulse" id="vignette"></div>
 <div class="flash" id="flash"></div>
