@@ -1031,6 +1031,41 @@ function refreshIntroMeta() {
   } catch (e) {}
 }
 
+
+async function clearMemoryAndCache() {
+  const ok = window.confirm(
+    '¿Borrar toda la memoria local, finales descubiertos, ajustes y caché?\n\nLa página se reiniciará. Esta acción no se puede deshacer.'
+  );
+  if (!ok) return;
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    // Otras claves antiguas por si acaso
+    Object.keys(localStorage).forEach(k => {
+      if (k.indexOf('ts09') === 0 || k.indexOf('test_subject') === 0) {
+        try { localStorage.removeItem(k); } catch (e) {}
+      }
+    });
+  } catch (e) {}
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) {}
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch (e) {}
+  // Hard reload bypassing cache
+  try {
+    window.location.reload(true);
+  } catch (e) {
+    window.location.href = window.location.href.split('#')[0] + (window.location.search ? '' : '') + '?t=' + Date.now();
+  }
+}
+
 function wireUI() {
   on($('settingsOpen'), 'click', openSettings);
   on($('settingsOpen2'), 'click', openSettings);
@@ -1056,6 +1091,7 @@ function wireUI() {
   on($('restartBtn'), 'click', reset);
   on($('againBtn'), 'click', reset);
 
+  on($('clearMemoryBtn'), 'click', () => { clearMemoryAndCache(); });
   on($('exportBtn'), 'click', () => {
     const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
