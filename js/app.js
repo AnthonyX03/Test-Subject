@@ -45,6 +45,11 @@ function initMusic() {
     music.horror.volume = 0.6;
     music.calm.preload = 'auto';
     music.horror.preload = 'auto';
+    music.calm.playsInline = true;
+    music.horror.playsInline = true;
+    // Start loading the audio files early; playback will be retried on the first gesture.
+    music.calm.load();
+    music.horror.load();
   } catch (e) {}
 }
 
@@ -1040,65 +1045,6 @@ function refreshIntroMeta() {
 }
 
 
-function openClearConfirm() {
-  const modal = $('clearConfirmModal');
-  if (modal) modal.classList.add('open');
-}
-function closeClearConfirm() {
-  const modal = $('clearConfirmModal');
-  if (modal) modal.classList.remove('open');
-}
-let clearingData = false;
-function clearMemoryAndCache() {
-  if (clearingData) return;
-  clearingData = true;
-  const confirmBtn = $('confirmClearBtn');
-  if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'BORRANDO…'; }
-  closeClearConfirm();
-
-  // Borrar datos síncronos primero y reiniciar inmediatamente dentro del gesto
-  // del usuario. Así el navegador no pierde la activación que permite iniciar audio.
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-    const keys = [];
-    for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
-    keys.forEach(k => {
-      if (k && (k.toLowerCase().startsWith('ts09') || k.toLowerCase().startsWith('test_subject'))) {
-        try { localStorage.removeItem(k); } catch (e) {}
-      }
-    });
-  } catch (e) {}
-
-  saveData = defaultSave();
-  // Mantener la preferencia de audio en esta sesión; no tocar los elementos Audio.
-  saveData.settings.sound = audioOn;
-  persist();
-  reset();
-  if (audioOn) {
-    music.unlocked = true;
-    // Reintento inmediato mientras el clic de confirmación sigue siendo válido.
-    playTrack('calm');
-  }
-  showSysMsg('MEMORIA BORRADA', 3500, false);
-
-  // No borrar la caché activa del Service Worker: hacerlo mientras está atendiendo
-  // peticiones puede romper la carga de recursos y dejar la aplicación bloqueada.
-  // Limpiar únicamente cachés antiguas de esta app, en segundo plano.
-  if ('caches' in window) {
-    caches.keys().then(keys => Promise.all(keys
-      .filter(k => /^ts-09/i.test(k) && k !== 'ts-09-v4.1')
-      .map(k => caches.delete(k))))
-      .catch(() => {})
-      .finally(() => {
-        clearingData = false;
-        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'SÍ, BORRAR TODO'; }
-      });
-  } else {
-    clearingData = false;
-    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'SÍ, BORRAR TODO'; }
-  }
-}
-
 function wireUI() {
   on($('settingsOpen'), 'click', openSettings);
   on($('settingsOpen2'), 'click', openSettings);
@@ -1124,10 +1070,6 @@ function wireUI() {
   on($('restartBtn'), 'click', reset);
   on($('againBtn'), 'click', reset);
 
-  on($('clearMemoryBtn'), 'click', openClearConfirm);
-  on($('cancelClearBtn'), 'click', closeClearConfirm);
-  on($('confirmClearBtn'), 'click', clearMemoryAndCache);
-  on($('clearConfirmModal'), 'click', e => { if (e.target === $('clearConfirmModal')) closeClearConfirm(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeClearConfirm(); });
   on($('exportBtn'), 'click', () => {
     const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
@@ -1195,14 +1137,21 @@ refreshIntroMeta();
 
 function resumeMusicFromGesture() {
   if (!audioOn) return;
-  music.unlocked = true;
   const wanted = started && (horrorMusicStarted || unsettling >= 5 || idx >= 8) ? 'horror' : 'calm';
   const current = music[wanted];
-  if (!current || current.paused) playTrack(wanted);
+  // Call play() immediately inside the real user gesture (not in a timer),
+  // which is the most compatible way to unlock audio under browser policies.
+  if (!current || current.paused) {
+    music.unlocked = true;
+    playTrack(wanted).catch(() => {});
+  }
 }
-// Browsers commonly block autoplay on page load. Try immediately, then retry
-// on the first genuine interaction without requiring the user to toggle audio.
-if (audioOn) playTrack('calm');
+// Autoplay is attempted on entry. If the browser blocks it, the first click,
+// tap, or keypress retries without requiring the audio toggle to be switched off/on.
+if (audioOn) {
+  try { music.calm.load(); } catch (e) {}
+  playTrack('calm').catch(() => {});
+}
 ['pointerdown', 'keydown', 'touchstart', 'click'].forEach(type => {
   document.addEventListener(type, resumeMusicFromGesture, { capture: true, passive: true });
 });
@@ -1210,6 +1159,7 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) resumeMusicFromGesture();
 });
 window.addEventListener('pageshow', resumeMusicFromGesture);
+window.addEventListener('focus', resumeMusicFromGesture);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
