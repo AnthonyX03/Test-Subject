@@ -37,16 +37,20 @@ const music = { calm: null, horror: null, current: null, unlocked: false };
 
 function initMusic() {
   try {
-    // URLs relativas al directorio de la web: funcionan también en GitHub Pages
-    // cuando el proyecto se publica dentro de un subdirectorio.
-    music.calm = new Audio(new URL('./audio/TEST.mp3', document.baseURI).href);
-    music.horror = new Audio(new URL('./audio/TESTHORROR.mp3', document.baseURI).href);
-    music.calm.loop = true;
-    music.horror.loop = true;
+    if (!music.calm) {
+      music.calm = new Audio('audio/TEST.mp3');
+      music.calm.loop = true;
+      music.calm.preload = 'auto';
+    }
+    if (!music.horror) {
+      music.horror = new Audio('audio/TESTHORROR.mp3');
+      music.horror.loop = true;
+      music.horror.preload = 'auto';
+    }
     music.calm.volume = 0.55;
     music.horror.volume = 0.6;
-    music.calm.preload = 'auto';
-    music.horror.preload = 'auto';
+    // Precarga
+    try { music.calm.load(); music.horror.load(); } catch (e2) {}
   } catch (e) {}
 }
 
@@ -67,6 +71,7 @@ function fadeVolume(audio, to, ms) {
 
 async function playTrack(which) {
   if (!audioOn || !music.unlocked) return;
+  initMusic();
   const next = which === 'horror' ? music.horror : music.calm;
   const prev = music.current;
   if (!next) return;
@@ -98,6 +103,8 @@ function stopAllMusic() {
 
 function unlockAndStartCalm() {
   music.unlocked = true;
+  initMusic();
+  ensureCtx();
   if (audioOn) playTrack('calm');
 }
 
@@ -148,6 +155,8 @@ function applySoundSetting(on) {
   if (st) st.textContent = '♫ AUDIO: ' + (audioOn ? 'ON' : 'OFF');
   if (audioOn) {
     music.unlocked = true;
+    initMusic();
+    ensureCtx();
     sound('good');
     startAmbient();
     if (started && (horrorMusicStarted || unsettling >= 5 || idx >= 8)) playTrack('horror');
@@ -1033,6 +1042,47 @@ function refreshIntroMeta() {
   } catch (e) {}
 }
 
+
+function openClearConfirm() {
+  closeSettings();
+  const m = $('clearConfirmModal');
+  if (m) m.classList.add('open');
+}
+function closeClearConfirm() {
+  const m = $('clearConfirmModal');
+  if (m) m.classList.remove('open');
+}
+async function clearMemoryAndCache() {
+  closeClearConfirm();
+  showSysMsg('BORRANDO MEMORIA Y CACHÉ…', 2000, true);
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    Object.keys(localStorage).forEach(k => {
+      if (k.indexOf('ts09') === 0 || k.indexOf('test_subject') === 0) {
+        try { localStorage.removeItem(k); } catch (e) {}
+      }
+    });
+  } catch (e) {}
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) {}
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch (e) {}
+  // Flag para reactivar audio limpio tras reload
+  try { sessionStorage.setItem('ts09_fresh', '1'); } catch (e) {}
+  setTimeout(() => {
+    const url = window.location.href.split('#')[0].split('?')[0] + '?nocache=' + Date.now();
+    window.location.replace(url);
+  }, 400);
+}
+
 function wireUI() {
   on($('settingsOpen'), 'click', openSettings);
   on($('settingsOpen2'), 'click', openSettings);
@@ -1058,6 +1108,12 @@ function wireUI() {
   on($('restartBtn'), 'click', reset);
   on($('againBtn'), 'click', reset);
 
+  on($('clearMemoryBtn'), 'click', openClearConfirm);
+  on($('clearConfirmYes'), 'click', () => { clearMemoryAndCache(); });
+  on($('clearConfirmNo'), 'click', closeClearConfirm);
+  on($('clearConfirmModal'), 'click', e => {
+    if (e.target === $('clearConfirmModal')) closeClearConfirm();
+  });
   on($('exportBtn'), 'click', () => {
     const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -1097,7 +1153,8 @@ function wireUI() {
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-      if ($('endingsModal') && $('endingsModal').classList.contains('open')) closeEndings();
+      if ($('clearConfirmModal') && $('clearConfirmModal').classList.contains('open')) closeClearConfirm();
+      else if ($('endingsModal') && $('endingsModal').classList.contains('open')) closeEndings();
       else if ($('settingsModal') && $('settingsModal').classList.contains('open')) closeSettings();
       else if (started && $('ending') && $('ending').classList.contains('hidden')) {
         addLine('Sesión pausada. Puedes reiniciar o cerrar la página.', 'system');
@@ -1111,8 +1168,10 @@ function wireUI() {
 initMusic();
 wireUI();
 applyLayout(saveData.settings.layout || 'auto');
-// Primera vez (sin partidas): audio activado por defecto
-if (!saveData.playCount) {
+// Primera vez / tras borrado: audio activado
+let freshBoot = false;
+try { freshBoot = sessionStorage.getItem('ts09_fresh') === '1'; sessionStorage.removeItem('ts09_fresh'); } catch (e) {}
+if (!saveData.playCount || freshBoot) {
   saveData.settings.sound = true;
   persist();
 }
@@ -1121,23 +1180,30 @@ const st = $('soundToggle');
 if (st) st.textContent = '♫ AUDIO: ' + (audioOn ? 'ON' : 'OFF');
 updateSettingsUI();
 refreshIntroMeta();
+initMusic();
 
-// Los navegadores bloquean el autoplay con sonido hasta que el usuario
-// interactúa. Desbloqueamos la música con la primera interacción en cualquier
-// parte de la página, no solamente al abrir Ajustes.
-function unlockAudioFromInteraction() {
-  if (audioOn && !music.unlocked) unlockAndStartCalm();
-  if (music.unlocked) {
-    document.removeEventListener('pointerdown', unlockAudioFromInteraction, true);
-    document.removeEventListener('touchstart', unlockAudioFromInteraction, true);
-    document.removeEventListener('keydown', unlockAudioFromInteraction, true);
-    document.removeEventListener('click', unlockAudioFromInteraction, true);
+function tryUnlockAudio() {
+  if (!audioOn) return;
+  const wasLocked = !music.unlocked;
+  music.unlocked = true;
+  initMusic();
+  ensureCtx();
+  // Solo arrancar pista si aún no hay música sonando
+  if (wasLocked && !started) {
+    const playing = music.current && !music.current.paused;
+    if (!playing) playTrack('calm');
   }
 }
-document.addEventListener('pointerdown', unlockAudioFromInteraction, true);
-document.addEventListener('touchstart', unlockAudioFromInteraction, true);
-document.addEventListener('keydown', unlockAudioFromInteraction, true);
-document.addEventListener('click', unlockAudioFromInteraction, true);
+// Primer gesto desbloquea audio (política del navegador)
+let audioGestureBound = false;
+function onAudioGesture() {
+  if (audioGestureBound) return;
+  audioGestureBound = true;
+  tryUnlockAudio();
+}
+['click', 'touchstart', 'keydown'].forEach(ev => {
+  document.addEventListener(ev, onAudioGesture, { capture: true, passive: true });
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
