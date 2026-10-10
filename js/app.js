@@ -69,6 +69,7 @@ async function playTrack(which) {
   if (!next) return false;
   const prev = music.current;
   if (prev === next && !next.paused) return true;
+  // Si estaba seleccionado pero pausado por el navegador, intentar reproducirlo otra vez.
   // Only fade out the previous track after the browser has accepted playback
   // of the new track. A rejected autoplay attempt must remain retryable.
   try {
@@ -1047,49 +1048,55 @@ function closeClearConfirm() {
   const modal = $('clearConfirmModal');
   if (modal) modal.classList.remove('open');
 }
-async function clearMemoryAndCache() {
+let clearingData = false;
+function clearMemoryAndCache() {
+  if (clearingData) return;
+  clearingData = true;
+  const confirmBtn = $('confirmClearBtn');
+  if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'BORRANDO…'; }
   closeClearConfirm();
-  // Remember the active track and its playback position before clearing data.
-  const activeTrack = music.current;
-  const wasPlaying = !!(activeTrack && !activeTrack.paused && audioOn);
-  const savedTime = activeTrack ? activeTrack.currentTime : 0;
+
+  // Borrar datos síncronos primero y reiniciar inmediatamente dentro del gesto
+  // del usuario. Así el navegador no pierde la activación que permite iniciar audio.
   try {
     localStorage.removeItem(STORAGE_KEY);
-    Object.keys(localStorage).forEach(k => {
-      if (k.indexOf('ts09') === 0 || k.indexOf('test_subject') === 0) {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+    keys.forEach(k => {
+      if (k && (k.toLowerCase().startsWith('ts09') || k.toLowerCase().startsWith('test_subject'))) {
         try { localStorage.removeItem(k); } catch (e) {}
       }
     });
   } catch (e) {}
-  // Delete this app's offline caches only. Do not unregister the service worker
-  // or interrupt the live audio elements; either can make playback flaky mid-session.
-  try {
-    if ('caches' in window) {
-      const keys = await caches.keys();
-      await Promise.all(keys.filter(k => /^ts-09/i.test(k)).map(k => caches.delete(k)));
-    }
-  } catch (e) {}
+
   saveData = defaultSave();
-  // Keep the user's current sound preference for this live session.
+  // Mantener la preferencia de audio en esta sesión; no tocar los elementos Audio.
   saveData.settings.sound = audioOn;
   persist();
   reset();
   if (audioOn) {
     music.unlocked = true;
-    const target = started && (horrorMusicStarted || unsettling >= 5 || idx >= 8) ? 'horror' : 'calm';
-    const track = music[target] || music.calm;
-    if (track) {
-      if (activeTrack && activeTrack !== track && !activeTrack.paused) {
-        try { activeTrack.pause(); } catch (e) {}
-      }
-      music.current = track;
-      if (wasPlaying || track.paused) {
-        try { if (Number.isFinite(savedTime) && activeTrack === track) track.currentTime = savedTime; } catch (e) {}
-        try { const p = track.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
-      }
-    }
+    // Reintento inmediato mientras el clic de confirmación sigue siendo válido.
+    playTrack('calm');
   }
-  showSysMsg('MEMORIA Y CACHÉ BORRADAS', 3500, false);
+  showSysMsg('MEMORIA BORRADA', 3500, false);
+
+  // No borrar la caché activa del Service Worker: hacerlo mientras está atendiendo
+  // peticiones puede romper la carga de recursos y dejar la aplicación bloqueada.
+  // Limpiar únicamente cachés antiguas de esta app, en segundo plano.
+  if ('caches' in window) {
+    caches.keys().then(keys => Promise.all(keys
+      .filter(k => /^ts-09/i.test(k) && k !== 'ts-09-v4.1')
+      .map(k => caches.delete(k))))
+      .catch(() => {})
+      .finally(() => {
+        clearingData = false;
+        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'SÍ, BORRAR TODO'; }
+      });
+  } else {
+    clearingData = false;
+    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'SÍ, BORRAR TODO'; }
+  }
 }
 
 function wireUI() {
@@ -1199,6 +1206,10 @@ if (audioOn) playTrack('calm');
 ['pointerdown', 'keydown', 'touchstart', 'click'].forEach(type => {
   document.addEventListener(type, resumeMusicFromGesture, { capture: true, passive: true });
 });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) resumeMusicFromGesture();
+});
+window.addEventListener('pageshow', resumeMusicFromGesture);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
