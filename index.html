@@ -211,8 +211,11 @@ body:not(.layout-pc) .topbar{font-size:9px}
           <button type="button" class="button" id="exportBtn">EXPORTAR PARTIDA</button>
           <button type="button" class="button" id="importBtn">IMPORTAR PARTIDA</button>
         </div>
+        <div class="row" style="margin-top:8px">
+          <button type="button" class="button" id="clearMemoryBtn" style="border-color:#6a3030;color:#ff9090">BORRAR MEMORIA Y CACHÉ</button>
+        </div>
         <input type="file" id="importFile" accept="application/json,.json" class="hidden">
-        <p class="hint">Exporta finales, memoria y ajustes. Todo es local en este dispositivo.</p>
+        <p class="hint">Exporta o importa finales y memoria. «Borrar memoria» limpia datos locales y caché, luego reinicia la página (útil tras actualizar).</p>
       </section>
       <section>
         <h4>FINALES</h4>
