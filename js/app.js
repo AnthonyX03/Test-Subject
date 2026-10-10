@@ -1,10 +1,11 @@
-/* TEST SUBJECT — App logic BUILD 4.1 */
+/* TEST SUBJECT — App logic BUILD 5.0 */
 (() => {
 'use strict';
 
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
-const STORAGE_KEY = 'ts09_save_v4';
+const STORAGE_KEY = 'ts09_save_v5';
+const APP_VERSION = '5.0';
 
 const ENDING_DEFS = [
   { id: 'clean', title: 'EVALUACIÓN COMPLETADA', blurb: 'Sesión limpia. El sistema te desea una noche tranquila.' },
@@ -41,17 +42,29 @@ function initMusic() {
       music.calm = new Audio('audio/TEST.mp3');
       music.calm.loop = true;
       music.calm.preload = 'auto';
+      music.calm.volume = 0.55;
     }
     if (!music.horror) {
       music.horror = new Audio('audio/TESTHORROR.mp3');
       music.horror.loop = true;
       music.horror.preload = 'auto';
+      music.horror.volume = 0.6;
     }
-    music.calm.volume = 0.55;
-    music.horror.volume = 0.6;
-    // Precarga
-    try { music.calm.load(); music.horror.load(); } catch (e2) {}
   } catch (e) {}
+}
+
+/** Intenta reproducir; devuelve true si el navegador lo permite */
+function tryPlay(audio) {
+  if (!audio) return Promise.resolve(false);
+  try {
+    const p = audio.play();
+    if (p && p.then) {
+      return p.then(() => true).catch(() => false);
+    }
+    return Promise.resolve(true);
+  } catch (e) {
+    return Promise.resolve(false);
+  }
 }
 
 function fadeVolume(audio, to, ms) {
@@ -79,17 +92,23 @@ async function playTrack(which) {
   try {
     if (prev && prev !== next && !prev.paused) {
       await fadeVolume(prev, 0, 600);
-      prev.pause();
-      prev.currentTime = 0;
+      try { prev.pause(); prev.currentTime = 0; } catch (e) {}
     }
     if (which === 'horror' && prev && prev !== next) {
       await new Promise(r => setTimeout(r, 700));
     }
-    next.volume = 0;
+    const targetVol = which === 'horror' ? 0.6 : 0.55;
+    next.volume = targetVol;
     music.current = next;
-    const p = next.play();
-    if (p && p.catch) p.catch(() => {});
-    await fadeVolume(next, which === 'horror' ? 0.6 : 0.55, 900);
+    const ok = await tryPlay(next);
+    if (!ok) {
+      // Autoplay bloqueado: reintentar en el próximo gesto
+      music.unlocked = false;
+      return;
+    }
+    // Fade suave solo si ya suena
+    next.volume = Math.min(next.volume, 0.15);
+    await fadeVolume(next, targetVol, 700);
   } catch (e) {}
 }
 
@@ -105,12 +124,22 @@ function unlockAndStartCalm() {
   music.unlocked = true;
   initMusic();
   ensureCtx();
-  if (audioOn) playTrack('calm');
+  if (audioOn) {
+    // Reproducción directa en el gesto del usuario (más fiable que async)
+    const a = music.calm;
+    if (a) {
+      a.volume = 0.55;
+      music.current = a;
+      tryPlay(a).then(ok => {
+        if (!ok) music.unlocked = false;
+      });
+    }
+  }
 }
 
 function defaultSave() {
   return {
-    version: 4,
+    version: 5,
     playCount: 0,
     discoveredEndings: [],
     past: { names: [], trusts: [], secrets: [], wakes: [], safes: [], answers: [], recentQuestions: [] },
@@ -1054,7 +1083,7 @@ function closeClearConfirm() {
 }
 async function clearMemoryAndCache() {
   closeClearConfirm();
-  showSysMsg('BORRANDO MEMORIA Y CACHÉ…', 2000, true);
+  showSysMsg('BORRANDO MEMORIA Y CACHÉ…', 2500, true);
   try {
     localStorage.removeItem(STORAGE_KEY);
     Object.keys(localStorage).forEach(k => {
@@ -1075,12 +1104,12 @@ async function clearMemoryAndCache() {
       await Promise.all(regs.map(r => r.unregister()));
     }
   } catch (e) {}
-  // Flag para reactivar audio limpio tras reload
   try { sessionStorage.setItem('ts09_fresh', '1'); } catch (e) {}
+  // Hard reload con cache-bust
   setTimeout(() => {
-    const url = window.location.href.split('#')[0].split('?')[0] + '?nocache=' + Date.now();
-    window.location.replace(url);
-  }, 400);
+    const base = window.location.href.split('#')[0].split('?')[0];
+    window.location.replace(base + '?v=' + APP_VERSION + '&t=' + Date.now());
+  }, 350);
 }
 
 function wireUI() {
@@ -1180,32 +1209,45 @@ const st = $('soundToggle');
 if (st) st.textContent = '♫ AUDIO: ' + (audioOn ? 'ON' : 'OFF');
 updateSettingsUI();
 refreshIntroMeta();
+
+const vb = $('versionBadge');
+if (vb) vb.textContent = 'v' + APP_VERSION;
+const sv = $('settingsVersion');
+if (sv) sv.textContent = 'TEST SUBJECT  ·  v' + APP_VERSION;
+
 initMusic();
 
 function tryUnlockAudio() {
-  if (!audioOn) return;
-  const wasLocked = !music.unlocked;
+  if (!audioOn) return false;
   music.unlocked = true;
   initMusic();
   ensureCtx();
-  // Solo arrancar pista si aún no hay música sonando
-  if (wasLocked && !started) {
-    const playing = music.current && !music.current.paused;
-    if (!playing) playTrack('calm');
+  const a = music.calm;
+  if (!a) return false;
+  if (!started) {
+    if (music.current === a && !a.paused) return true;
+    a.volume = 0.55;
+    music.current = a;
+    tryPlay(a);
   }
+  return true;
 }
-// Primer gesto desbloquea audio (política del navegador)
-let audioGestureBound = false;
-function onAudioGesture() {
-  if (audioGestureBound) return;
-  audioGestureBound = true;
-  tryUnlockAudio();
-}
-['click', 'touchstart', 'keydown'].forEach(ev => {
-  document.addEventListener(ev, onAudioGesture, { capture: true, passive: true });
+// Cualquier gesto puede desbloquear (autoplay policy)
+['pointerdown', 'click', 'touchstart', 'keydown'].forEach(ev => {
+  document.addEventListener(ev, () => {
+    if (audioOn && (!music.unlocked || (music.calm && music.calm.paused && !started))) {
+      tryUnlockAudio();
+    }
+  }, { capture: true, passive: true });
 });
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js?v=5.0').then(reg => {
+      // Fuerza búsqueda de actualización (importante en PC)
+      try { reg.update(); } catch (e) {}
+      setInterval(() => { try { reg.update(); } catch (e) {} }, 60000);
+    }).catch(() => {});
+  });
 }
 })();
