@@ -1,5 +1,5 @@
-/* TEST SUBJECT — Service Worker (offline cache) */
-const CACHE = 'ts-09-v4.1';
+/* TEST SUBJECT — Service Worker v5.0 */
+const CACHE = 'ts-09-v5.0';
 const ASSETS = [
   './',
   './index.html',
@@ -37,8 +37,34 @@ self.addEventListener('activate', e => {
   );
 });
 
+// Network-first for HTML/JS (actualizaciones en PC), cache-first para audio/iconos
 self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('./index.html')))
-  );
+  const url = new URL(e.request.url);
+  const isAppShell =
+    url.pathname.endsWith('.html') ||
+    url.pathname.endsWith('/') ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('manifest.json');
+
+  if (e.request.method !== 'GET') return;
+
+  if (isAppShell) {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+          return res;
+        })
+        .catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
+    );
+  } else {
+    e.respondWith(
+      caches.match(e.request).then(r => r || fetch(e.request).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+        return res;
+      }).catch(() => caches.match('./index.html')))
+    );
+  }
 });

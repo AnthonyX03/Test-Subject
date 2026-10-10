@@ -172,9 +172,13 @@ body:not(.layout-pc) .topbar{font-size:9px}
 .speaker.tone-uneasy{color:#a0a060}
 .speaker.tone-warm{color:#7aba80}
 
+
+.version-badge{position:fixed;bottom:10px;right:12px;font-size:10px;letter-spacing:.12em;color:#3a5a42;z-index:50;pointer-events:none;opacity:.85}
+.modal .version-in{font-size:10px;letter-spacing:.14em;color:#4a6a52;margin-top:8px;text-align:right}
 </style>
 </head>
 <body>
+<div class="version-badge" id="versionBadge">v5.0</div>
 <div class="noise" id="noise"></div>
 <div class="scanline-extra" id="scanExtra"></div>
 <div class="vignette-pulse" id="vignette"></div>
@@ -229,6 +233,7 @@ body:not(.layout-pc) .topbar{font-size:9px}
       <div class="close-row">
         <button type="button" class="button" id="settingsClose">CERRAR</button>
       </div>
+      <p class="version-in" id="settingsVersion">v5.0</p>
     </div>
   </div>
 </div>
@@ -349,7 +354,7 @@ body:not(.layout-pc) .topbar{font-size:9px}
   </footer>
 </main>
 
-<script src="js/questions.js"></script>
-<script src="js/app.js"></script>
+<script src="js/questions.js?v=5.0"></script>
+<script src="js/app.js?v=5.0"></script>
 </body>
 </html>
