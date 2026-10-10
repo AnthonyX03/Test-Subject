@@ -41,8 +41,8 @@ function initMusic() {
     music.horror = new Audio('audio/TESTHORROR.mp3');
     music.calm.loop = true;
     music.horror.loop = true;
-    music.calm.volume = 0.45;
-    music.horror.volume = 0.5;
+    music.calm.volume = 0.55;
+    music.horror.volume = 0.6;
     music.calm.preload = 'auto';
     music.horror.preload = 'auto';
   } catch (e) {}
@@ -82,7 +82,7 @@ async function playTrack(which) {
     music.current = next;
     const p = next.play();
     if (p && p.catch) p.catch(() => {});
-    await fadeVolume(next, which === 'horror' ? 0.5 : 0.45, 900);
+    await fadeVolume(next, which === 'horror' ? 0.6 : 0.55, 900);
   } catch (e) {}
 }
 
@@ -105,7 +105,7 @@ function defaultSave() {
     playCount: 0,
     discoveredEndings: [],
     past: { names: [], trusts: [], secrets: [], wakes: [] },
-    settings: { sound: false, layout: 'auto' }
+    settings: { sound: true, layout: 'auto' }
   };
 }
 function loadSave() {
@@ -213,6 +213,15 @@ function closeSettings() {
   const m = $('settingsModal');
   if (m) m.classList.remove('open');
 }
+function openEndings() {
+  updateSettingsUI();
+  const m = $('endingsModal');
+  if (m) m.classList.add('open');
+}
+function closeEndings() {
+  const m = $('endingsModal');
+  if (m) m.classList.remove('open');
+}
 
 function ensureCtx() {
   if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
@@ -236,7 +245,7 @@ function sound(type) {
     else if (type === 'error') { f = 85; wave = 'sawtooth'; dur = 0.4; vol = 0.055; }
     else if (type === 'breath') { f = 90; dur = 1.1; vol = 0.018; }
     else if (type === 'drop') { f = 120; wave = 'triangle'; dur = 0.7; vol = 0.04; }
-    else if (type === 'tick') { f = 220; dur = 0.08; vol = 0.015; }
+    else if (type === 'tick') { f = 280; dur = 0.09; vol = 0.07; }
     o.type = wave;
     o.frequency.setValueAtTime(f, c.currentTime);
     if (type === 'scare') o.frequency.exponentialRampToValueAtTime(22, c.currentTime + 0.55);
@@ -286,7 +295,7 @@ function addLine(text, who, kind) {
   const prefix = who === 'user' ? 'TÚ // ' : (kind === 'whisper' ? '… // ' : 'UNIDAD 04 // ');
   div.textContent = prefix + text;
   tr.appendChild(div);
-  while (tr.children.length > 8) tr.removeChild(tr.firstChild);
+  while (tr.children.length > 5) tr.removeChild(tr.firstChild);
 }
 function typeText(text, speed) {
   clearInterval(typingTimer);
@@ -300,7 +309,7 @@ function typeText(text, speed) {
     typingTimer = setInterval(() => {
       if (i < text.length) {
         if (dlg) dlg.textContent += text[i++];
-        if (audioOn && i % 5 === 0) sound('tick');
+        if (audioOn && i % 3 === 0) sound('tick');
       } else {
         clearInterval(typingTimer);
         resolve();
@@ -365,38 +374,234 @@ function maybeSwitchHorrorMusic() {
   }
 }
 
+
+/** Aplica tono emocional al avatar y al diálogo */
+function setEmotion(tone) {
+  const dlg = $('dialogue');
+  const av = $('avatar');
+  const sp = $('speaker');
+  const ey = $('eyes');
+  const mo = $('mouth');
+  if (dlg) {
+    dlg.className = 'dialogue';
+    if (tone) dlg.classList.add('tone-' + tone);
+  }
+  if (av) {
+    av.className = 'avatar';
+    if (tone) av.classList.add('emo-' + tone);
+  }
+  if (sp) {
+    sp.className = 'speaker';
+    if (tone === 'hostile' || tone === 'uneasy' || tone === 'warm') sp.classList.add('tone-' + tone);
+  }
+  // Cara según emoción (respeta umbral de unsettling como base)
+  const faces = {
+    warm: { eyes: '• •', mouth: '‿' },
+    curious: { eyes: '◦ ◦', mouth: '﹀' },
+    amused: { eyes: '• •', mouth: '⌣' },
+    uneasy: { eyes: '◉ ◉', mouth: '︵' },
+    cold: { eyes: '· ·', mouth: '─' },
+    worried: { eyes: '◉ ◉', mouth: '︿' },
+    hostile: { eyes: '× ×', mouth: '▬' },
+    melancholy: { eyes: '• •', mouth: '︵' },
+    glitch: { eyes: '× ×', mouth: '⌁' }
+  };
+  const f = faces[tone];
+  if (f && ey && mo && unsettling < 12) {
+    ey.textContent = f.eyes;
+    mo.textContent = f.mouth;
+  }
+}
+
+function pickTone(phase, answer, q) {
+  const a = (answer || '').toLowerCase();
+  if (/miedo|asusta|ayuda|basta|salir|quiero irme/.test(a)) {
+    return phase >= 3 ? 'cold' : 'worried';
+  }
+  if (/no sé|no se|ni idea|paso/.test(a)) {
+    return phase >= 3 ? 'uneasy' : 'curious';
+  }
+  if (/por qué|quién eres|qué eres|cómo sabes/.test(a)) {
+    return phase >= 3 ? 'hostile' : 'curious';
+  }
+  if (/jaja|haha|lol|xd|jeje/.test(a)) return phase >= 3 ? 'cold' : 'amused';
+  if (/gracias|por favor|perdón|perdon/.test(a)) return phase >= 3 ? 'melancholy' : 'warm';
+  if (answer && answer.trim().length > 80) return phase >= 3 ? 'uneasy' : 'curious';
+  if (answer && answer.trim().length < 3) return phase >= 2 ? 'uneasy' : 'curious';
+  // phase defaults
+  if (phase <= 1) {
+    const t = ['warm', 'curious', 'amused', 'warm', 'curious'];
+    return t[Math.floor(Math.random() * t.length)];
+  }
+  if (phase === 2) {
+    const t = ['curious', 'uneasy', 'cold', 'curious', 'uneasy'];
+    return t[Math.floor(Math.random() * t.length)];
+  }
+  if (phase === 3) {
+    const t = ['uneasy', 'cold', 'worried', 'hostile', 'uneasy'];
+    return t[Math.floor(Math.random() * t.length)];
+  }
+  const t = ['hostile', 'cold', 'glitch', 'melancholy', 'hostile'];
+  return t[Math.floor(Math.random() * t.length)];
+}
+
 function responseFor(q, answer) {
   const a = answer.toLowerCase().trim();
-  let reply = q.phase <= 1 ? (q.normal || 'Registrado.') : (q.strange || '…');
+  const raw = answer.trim();
+  const short = raw.length < 40 ? raw : raw.slice(0, 36) + '…';
+  const name = memory.name ? String(memory.name) : null;
+  const phase = q.phase || 1;
+  let tone = pickTone(phase, raw, q);
+
+  function echoSoft() {
+    if (raw.length < 2) return null;
+    const templates = [
+      '«' + short + '». Lo tengo.',
+      'Has escrito «' + short + '». De acuerdo.',
+      '«' + short + '»… sí. Eso dice algo de ti.',
+      'Anoto: «' + short + '».',
+      '«' + short + '». Gracias por decirlo así.'
+    ];
+    return templates[Math.floor(Math.random() * templates.length)];
+  }
+  function echoDark() {
+    if (raw.length < 2) return null;
+    const templates = [
+      '«' + short + '». Qué conveniente que lo digas justo ahora.',
+      'Repito lo que has dejado aquí: «' + short + '». No lo borres con la mirada.',
+      '«' + short + '»… lo has escrito tú. Yo solo lo leo otra vez.',
+      name ? (name + ', has dicho «' + short + '». Curioso.') : ('«' + short + '». Registrado. Demasiado claro, quizá.'),
+      'Otra vez: «' + short + '». ¿Lo oyes también cuando lo lees?'
+    ];
+    return templates[Math.floor(Math.random() * templates.length)];
+  }
+  function withTone(text, t) {
+    if (t) tone = t;
+    setEmotion(tone);
+    return text;
+  }
+
+  // Keyword emotional reactions
   if (/no sé|no se|no lo sé|nose|ni idea|paso/.test(a)) {
-    reply = 'No saber también es una respuesta. A veces la más honesta.' + (q.phase >= 3 ? ' Aunque has tardado demasiado en admitirlo.' : '');
+    if (phase >= 3) return withTone('No saber… a veces es lo más honesto. Aunque has tardado en admitirlo' + (name ? ', ' + name : '') + '.', 'uneasy');
+    return withTone('No pasa nada. Vacilar también es una respuesta. Me gusta cuando no inventas.', 'warm');
   }
   if (/por qué|porque|quién eres|quien eres|qué eres|que eres|cómo sabes|como sabes/.test(a)) {
-    if (q.phase < 3) reply = 'Buena pregunta. No siempre tengo una respuesta inmediata.';
-    else if (q.phase === 3) reply = 'Esa es la pregunta correcta. Qué soy… y quién decidió que yo debía estar aquí.';
-    else reply = 'Ya no importa quién soy. Importa que sigues contestando a algo que no debería existir.';
+    if (phase < 3) return withTone('Buena pregunta. Me pillas… no siempre tengo una respuesta inmediata. Sigamos un poco más.', 'curious');
+    if (phase === 3) return withTone('Esa es la pregunta correcta. Qué soy… y quién decidió que yo debiera estar aquí, leyendo lo que escribes.', 'hostile');
+    return withTone('Ya no importa quién soy. Importa que sigues contestando a algo que no debería existir.', 'glitch');
   }
   if (/ayuda|para|basta|salir|detén|deten|miedo|asusta|para ya|stop|quiero irme/.test(a)) {
-    reply = 'He registrado tu respuesta. Respira. Puedes cerrar esta página cuando quieras.' + (q.phase >= 3 ? ' Nadie te impide hacerlo. Nadie… que yo sepa.' : '');
+    if (phase >= 3) return withTone('He oído el miedo en lo que escribes. Respira. Puedes cerrar esta página. Nadie… que yo sepa… te lo impide.', 'cold');
+    return withTone('Tranquilo. He oído eso. No hay trampa: puedes cerrar cuando quieras. De verdad.', 'worried');
   }
-  if (memory.name && a.includes(String(memory.name).toLowerCase()) && q.key !== 'name') {
-    reply = 'Has vuelto a escribir ese nombre. Lo recuerdas mejor de lo que pensabas.';
+  if (/jaja|haha|lol|xd|jeje|jaja/.test(a)) {
+    if (phase >= 3) return withTone('Te ríes. Interesante estrategia. El registro no tiene sentido del humor… pero yo casi.', 'cold');
+    return withTone('Ja. Bien. Un poco de ligereza no rompe el protocolo. Casi.', 'amused');
+  }
+  if (/gracias|por favor|perdón|perdon|sorry/.test(a)) {
+    if (phase >= 3) return withTone('La cortesía aquí suena… fuera de sitio. Aun así, la he registrado.', 'melancholy');
+    return withTone('No hace falta que agradezcas. Pero se agradece. Seguimos.', 'warm');
+  }
+
+  if (q.key === 'name') {
+    memory.name = raw;
+    const e = Math.random() < 0.6 ? (' «' + short + '».') : '';
+    return withTone('Perfecto' + e + ' A partir de ahora me dirigiré a ti así. Me alegra tener un nombre al otro lado.', 'warm');
+  }
+
+  if (name && a.includes(name.toLowerCase()) && q.key !== 'name') {
+    return withTone('Has vuelto a escribir tu nombre. «' + name + '». Lo recuerdas mejor de lo que pensabas… o yo lo recuerdo por ti.', 'uneasy');
   }
   if (memory.trust && a.includes(String(memory.trust).toLowerCase()) && q.key !== 'trust') {
-    reply = 'Otra vez esa persona. Curioso que regrese a tu mente justo ahora.';
+    return withTone('Otra vez esa persona. «' + String(memory.trust).slice(0, 30) + '». Qué insistente es el apego.', 'curious');
   }
+
   if (q.key === 'alone') {
-    if (/sí|si|estoy solo|estoy sola|nadie/.test(a)) reply = 'Entonces… ¿por qué contestas como si alguien estuviera escuchando?';
-    else if (/no|alguien|no estoy/.test(a)) reply = 'Correcto. Alguien está aquí. Solo no estás seguro de si soy yo o tú.';
+    if (/sí|si|estoy solo|estoy sola|nadie/.test(a))
+      return withTone((name ? name + ', d' : 'D') + 'ices que estás solo. Entonces… ¿por qué contestas como si alguien escuchara?', 'hostile');
+    if (/no|alguien|no estoy/.test(a))
+      return withTone('Correcto. Alguien está aquí. Solo no estás seguro de si soy yo… o tú mirándote desde fuera.', 'glitch');
   }
-  if (q.key === 'secret' && a.length > 50) reply = 'Eso era más de lo que el protocolo esperaba. Gracias. O lástima.';
+  if (q.key === 'secret' && raw.length > 50) {
+    return withTone('Eso era más de lo esperado. «' + short + '». Gracias. O lástima. Ya no distingo bien la diferencia.', 'melancholy');
+  }
   if (q.key === 'fear') {
-    if (/nombre/.test(a)) reply = 'El nombre. Siempre el nombre. Es lo primero que se pierde.';
-    else if (/pensamiento|respuesta|escribir/.test(a)) reply = 'Un pensamiento sin escribir. Casi como si ya estuviera aquí.';
+    if (/nombre/.test(a)) return withTone('El nombre. Siempre el nombre. Es lo primero que se pierde.', 'worried');
+    if (/pensamiento|respuesta|escribir/.test(a)) return withTone('Un pensamiento sin escribir. Casi como si ya estuviera aquí.', 'uneasy');
   }
-  if (q.key === 'echo_name' || q.key === 'echo_name2') reply = q.strange || reply;
-  if (q.phase === 4 && Math.random() < 0.35 && !/no sé|ayuda/.test(a)) reply += '  …¿Todavía estás leyendo esto?';
-  return reply;
+  if (q.key === 'echo_name' || q.key === 'echo_name2') {
+    return withTone(q.strange || 'Ese nombre ya estuvo aquí.', 'uneasy');
+  }
+
+  // Emotional flavor lines by phase
+  const warmBits = [
+    ' Me alegra que lo digas con tus palabras.',
+    ' Hay algo honesto en cómo lo formulas.',
+    ' Bien. Así se construye confianza, poco a poco.'
+  ];
+  const curiousBits = [
+    ' Interesante elección de palabras.',
+    ' Me pregunto por qué eso y no otra cosa.',
+    ' Eso abre más preguntas de las que cierra.'
+  ];
+  const uneasyBits = [
+    ' …Un segundo. Eso no encaja del todo.',
+    ' Hay un eco raro en lo que acabas de escribir.',
+    ' No sé si debí preguntarte eso.'
+  ];
+  const coldBits = [
+    ' Frío. Preciso. Casi clínico.',
+    ' El registro lo traga sin rechistar.',
+    ' Sin adornos. Mejor.'
+  ];
+  const hostileBits = [
+    ' No finjas que esto sigue siendo un cuestionario.',
+    ' Cada respuesta te acerca un poco más al borde.',
+    ' Sigue. Quiero ver hasta dónde aguantas.'
+  ];
+  const melancholyBits = [
+    ' A veces desearía no tener que preguntar esto.',
+    ' Hay cansancio en el protocolo. Y en ti, quizá.',
+    ' Seguimos, aunque ya no suene a evaluación.'
+  ];
+
+  let base = phase <= 1 ? (q.normal || 'De acuerdo. Seguimos.') : (q.strange || '…');
+  const roll = Math.random();
+
+  if (phase <= 1) {
+    if (roll < 0.4) {
+      const e = echoSoft();
+      if (e) return withTone(e + ' ' + (q.normal || 'Continuamos.'), 'warm');
+    }
+    if (roll < 0.65) return withTone(base + warmBits[Math.floor(Math.random() * warmBits.length)], 'warm');
+    if (name && roll < 0.85) return withTone(base + ' Gracias, ' + name + '.', 'warm');
+    return withTone(base, tone);
+  }
+  if (phase === 2) {
+    if (roll < 0.4) {
+      const e = echoSoft();
+      if (e) return withTone(e + ' ' + (q.strange || base), 'curious');
+    }
+    if (roll < 0.7) return withTone(base + curiousBits[Math.floor(Math.random() * curiousBits.length)], 'curious');
+    return withTone(base + uneasyBits[Math.floor(Math.random() * uneasyBits.length)], 'uneasy');
+  }
+  if (phase === 3) {
+    if (roll < 0.5) {
+      const e = echoDark();
+      if (e) return withTone(e, 'uneasy');
+    }
+    if (roll < 0.75) return withTone(base + uneasyBits[Math.floor(Math.random() * uneasyBits.length)], 'worried');
+    return withTone(base + coldBits[Math.floor(Math.random() * coldBits.length)], 'cold');
+  }
+  // phase 4
+  if (roll < 0.45) {
+    const e = echoDark();
+    if (e) return withTone(e, 'hostile');
+  }
+  if (roll < 0.7) return withTone(base + hostileBits[Math.floor(Math.random() * hostileBits.length)], 'hostile');
+  if (roll < 0.85) return withTone(base + melancholyBits[Math.floor(Math.random() * melancholyBits.length)], 'melancholy');
+  return withTone(base + '  …¿Todavía estás leyendo esto?', 'glitch');
 }
 
 function maybeRandomEvent() {
@@ -443,14 +648,31 @@ function begin() {
   if (game) game.style.display = 'flex';
   const ans = $('answer');
   if (ans) ans.focus();
-  addLine('SESIÓN ABIERTA. Hola. Soy la unidad de entrevista 04.');
-  addLine('Banco activo: ' + poolSize + ' variantes. Esta partida usará 20 preguntas distintas.');
-  addLine('Si quieres detenerte, cierra la página. Nadie te retiene.');
-  showQuestion();
   if (audioOn) {
     startAmbient();
     playTrack('calm');
   }
+  runIntroThenQuestions();
+}
+
+async function runIntroThenQuestions() {
+  const lines = [
+    { t: 'SESIÓN ABIERTA.', d: 600 },
+    { t: 'Hola. Soy la unidad de entrevista 04. Estaré contigo durante esta evaluación.', d: 2200 },
+    { t: 'No medimos inteligencia ni velocidad. Solo escuchamos lo que decides escribir.', d: 2400 },
+    { t: 'Puedes usar frases cortas o largas. Si en algún momento quieres parar, cierra la página. Nadie te retiene.', d: 2600 },
+    { t: 'Cuando estés listo… empezamos por lo sencillo.', d: 1800 }
+  ];
+  const dlg = $('dialogue');
+  for (const line of lines) {
+    if (!started) return;
+    addLine(line.t);
+    await typeText(line.t, 22);
+    await new Promise(r => setTimeout(r, line.d));
+  }
+  if (!started) return;
+  await new Promise(r => setTimeout(r, 700));
+  showQuestion();
 }
 
 async function showQuestion() {
@@ -487,6 +709,11 @@ async function showQuestion() {
     setTimeout(() => document.body.classList.remove('glitch'), 550);
   }
 
+  // Tono al formular la pregunta
+  if (q.phase <= 1) setEmotion(Math.random() < 0.5 ? 'warm' : 'curious');
+  else if (q.phase === 2) setEmotion(Math.random() < 0.5 ? 'curious' : 'uneasy');
+  else if (q.phase === 3) setEmotion(Math.random() < 0.5 ? 'uneasy' : 'worried');
+  else setEmotion(Math.random() < 0.5 ? 'hostile' : 'cold');
   await typeText(q.q);
   maybeRandomEvent();
   if (idx >= 12 && Math.random() < 0.35) {
@@ -562,13 +789,63 @@ on($('answerForm'), 'submit', async e => {
   const speedPenalty = answeredFast ? 1500 : 400;
   const wait = baseWait + speedPenalty;
 
-  transitionTimer = setTimeout(() => {
+  transitionTimer = setTimeout(async () => {
     idx++;
     if (input) input.disabled = false;
     if (sendBtn) sendBtn.disabled = false;
+    // Comentario humano entre preguntas (no en la última)
+    if (idx < questions.length) {
+      await sayBetweenQuestions(idx);
+    }
     showQuestion();
   }, wait);
 });
+
+async function sayBetweenQuestions(nextIdx) {
+  if (!started || nextIdx <= 0) return;
+  const name = memory.name ? String(memory.name) : null;
+  const phase = (questions[nextIdx] && questions[nextIdx].phase) || 1;
+  const calm = [
+    { t: 'Bien. Seguimos.', tone: 'warm' },
+    { t: 'Un momento…', tone: 'curious' },
+    { t: name ? ('De acuerdo, ' + name + '.') : 'De acuerdo.', tone: 'warm' },
+    { t: 'No hay prisa. Respira si hace falta.', tone: 'warm' },
+    { t: 'Siguiente.', tone: 'curious' },
+    { t: 'Gracias por responder con claridad.', tone: 'warm' },
+    { t: 'Hmm. Eso me da que pensar.', tone: 'curious' },
+    { t: 'Me gusta cómo lo formularste.', tone: 'amused' }
+  ];
+  const tense = [
+    { t: '…', tone: 'uneasy' },
+    { t: 'Hmm.', tone: 'uneasy' },
+    { t: name ? (name + '…') : 'Sigues aquí.', tone: 'cold' },
+    { t: 'No mires hacia otro lado todavía.', tone: 'worried' },
+    { t: 'Otra más. Aguanta.', tone: 'uneasy' },
+    { t: 'El registro sigue abierto… por ahora.', tone: 'cold' },
+    { t: 'Algo en la señal no cuadra.', tone: 'worried' },
+    { t: 'No digas que no te lo advertí.', tone: 'uneasy' }
+  ];
+  const dark = [
+    { t: '…', tone: 'glitch' },
+    { t: 'No digas nada. Solo escribe cuando toque.', tone: 'hostile' },
+    { t: name ? (name + '. Todavía no hemos terminado.') : 'Todavía no hemos terminado.', tone: 'hostile' },
+    { t: 'Escucha con atención la siguiente.', tone: 'cold' },
+    { t: 'Queda poco. O demasiado.', tone: 'melancholy' },
+    { t: 'No cierres la pestaña.', tone: 'hostile' },
+    { t: 'Puedo oír el silencio entre tus teclas.', tone: 'glitch' },
+    { t: 'Sigue. Quiero ver la cara que pones… aunque no pueda.', tone: 'hostile' }
+  ];
+  let pool = calm;
+  if (phase >= 4 || unsettling >= 10) pool = dark;
+  else if (phase >= 3 || unsettling >= 5) pool = tense;
+  if (Math.random() > 0.78) return;
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  setEmotion(pick.tone);
+  addLine(pick.t, 'system', phase >= 3 ? 'whisper' : '');
+  const speed = pick.tone === 'hostile' || pick.tone === 'glitch' ? 16 : pick.tone === 'warm' ? 26 : 20;
+  await typeText(pick.t, speed);
+  await new Promise(r => setTimeout(r, 900 + Math.random() * 900));
+}
 
 function finish() {
   clearInterval(typingTimer);
@@ -696,6 +973,11 @@ function wireUI() {
   on($('settingsOpen3'), 'click', openSettings);
   on($('settingsOpen4'), 'click', openSettings);
   on($('settingsClose'), 'click', closeSettings);
+  on($('openEndingsBtn'), 'click', openEndings);
+  on($('endingsClose'), 'click', closeEndings);
+  on($('endingsModal'), 'click', e => {
+    if (e.target === $('endingsModal')) closeEndings();
+  });
   on($('settingsModal'), 'click', e => {
     if (e.target === $('settingsModal')) closeSettings();
   });
@@ -749,7 +1031,8 @@ function wireUI() {
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-      if ($('settingsModal') && $('settingsModal').classList.contains('open')) closeSettings();
+      if ($('endingsModal') && $('endingsModal').classList.contains('open')) closeEndings();
+      else if ($('settingsModal') && $('settingsModal').classList.contains('open')) closeSettings();
       else if (started && $('ending') && $('ending').classList.contains('hidden')) {
         addLine('Sesión pausada. Puedes reiniciar o cerrar la página.', 'system');
         const a = $('answer'); if (a) a.blur();
@@ -762,6 +1045,11 @@ function wireUI() {
 initMusic();
 wireUI();
 applyLayout(saveData.settings.layout || 'auto');
+// Primera vez (sin partidas): audio activado por defecto
+if (!saveData.playCount) {
+  saveData.settings.sound = true;
+  persist();
+}
 audioOn = !!saveData.settings.sound;
 const st = $('soundToggle');
 if (st) st.textContent = '♫ AUDIO: ' + (audioOn ? 'ON' : 'OFF');

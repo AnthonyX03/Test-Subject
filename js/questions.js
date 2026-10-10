@@ -335,7 +335,21 @@
         picks.push(item);
       }
     }
-    return { questions: picks.slice(0, count), poolSize: total };
+    // Siempre primera pregunta = nombre (identidad)
+    const nameQ = {
+      q: 'Para empezar, algo sencillo. ¿Cómo te gustaría que te llamara durante esta sesión?',
+      tag: 'IDENTIDAD',
+      key: 'name',
+      phase: 1,
+      normal: 'Gracias. Es más fácil conversar cuando sabemos cómo dirigirnos a alguien.',
+      strange: 'Ese nombre queda registrado. Aunque no estoy seguro de que sea el que usas cuando nadie te oye.'
+    };
+    // Quitar cualquier otra pregunta de nombre/identidad del resto
+    let rest = picks.filter(p => p.key !== 'name' && p.tag !== 'IDENTIDAD');
+    // Reconstruir: nombre + resto hasta count
+    const final = [nameQ].concat(rest).slice(0, count);
+    // Asegurar fases coherentes en orden (ya vienen por fase)
+    return { questions: final, poolSize: total };
   }
 
   global.TSQuestions = {
