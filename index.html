@@ -172,6 +172,15 @@ body:not(.layout-pc) .topbar{font-size:9px}
 .speaker.tone-uneasy{color:#a0a060}
 .speaker.tone-warm{color:#7aba80}
 
+
+#clearConfirmModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.82);backdrop-filter:blur(5px)}
+#clearConfirmModal.open{display:flex}
+#clearConfirmModal .confirm-panel{width:min(100%,460px);padding:24px;border:1px solid #ff5555;background:#080b09;box-shadow:0 0 35px #ff222233;color:#d8e8dc}
+#clearConfirmModal h2{margin:0 0 12px;color:#ff7777;font-size:1.1rem;letter-spacing:.12em}
+#clearConfirmModal p{line-height:1.6;color:#aab8ad}
+#clearConfirmModal .confirm-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+#clearConfirmModal button{flex:1;min-width:130px;padding:12px;background:#101812;border:1px solid #52745b;color:#c8f5d0;font:inherit;cursor:pointer}
+#clearConfirmModal #confirmClearBtn{border-color:#ff5555;color:#ff8585}
 </style>
 </head>
 <body>
@@ -333,5 +342,5 @@ body:not(.layout-pc) .topbar{font-size:9px}
 
 <script src="js/questions.js"></script>
 <script src="js/app.js"></script>
-</body>
+<div id="clearConfirmModal" role="dialog" aria-modal="true" aria-labelledby="clearConfirmTitle"><div class="confirm-panel"><h2 id="clearConfirmTitle">⚠ CONFIRMAR BORRADO</h2><p>Se eliminarán la memoria local, los finales descubiertos, los ajustes guardados y la caché de esta aplicación.</p><p><strong>Esta acción no se puede deshacer.</strong> ¿Quieres continuar?</p><div class="confirm-actions"><button type="button" id="cancelClearBtn">CANCELAR</button><button type="button" id="confirmClearBtn">SÍ, BORRAR TODO</button></div></div></div></body>
 </html>
