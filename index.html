@@ -177,10 +177,24 @@ body:not(.layout-pc) .topbar{font-size:9px}
 
 .version-badge{position:fixed;bottom:10px;right:12px;font-size:10px;letter-spacing:.12em;color:#3a5a42;z-index:50;pointer-events:none;opacity:.85}
 .modal .version-in{font-size:10px;letter-spacing:.14em;color:#4a6a52;margin-top:8px;text-align:right}
+
+.audio-gate{position:fixed;inset:0;z-index:60;background:#050806ee;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;cursor:pointer;transition:opacity .35s}
+.audio-gate.hide{opacity:0;pointer-events:none}
+.audio-gate .ag-title{font-size:13px;letter-spacing:.22em;color:#7ab88a}
+.audio-gate .ag-sub{font-size:11px;color:#5a7a62;letter-spacing:.08em;max-width:280px;text-align:center;line-height:1.6}
+.audio-gate .ag-btn{border:1px solid #3a6a45;background:#0a1810;color:#9ed4aa;padding:14px 28px;font-size:12px;letter-spacing:.16em;cursor:pointer}
+.audio-gate .ag-btn:active{background:#122818}
+
 </style>
 </head>
 <body>
-<div class="version-badge" id="versionBadge">v5.1</div>
+<div class="audio-gate" id="audioGate" role="button" tabindex="0" aria-label="Activar audio">
+  <div class="ag-title">◈ TEST SUBJECT</div>
+  <button type="button" class="ag-btn" id="audioGateBtn">TOCAR PARA ACTIVAR AUDIO</button>
+  <div class="ag-sub">El navegador bloquea el sonido hasta un toque. Después la música arranca sola.</div>
+</div>
+
+<div class="version-badge" id="versionBadge">v5.2</div>
 <div class="noise" id="noise"></div>
 <div class="scanline-extra" id="scanExtra"></div>
 <div class="vignette-pulse" id="vignette"></div>
@@ -235,7 +249,7 @@ body:not(.layout-pc) .topbar{font-size:9px}
       <div class="close-row">
         <button type="button" class="button" id="settingsClose">CERRAR</button>
       </div>
-      <p class="version-in" id="settingsVersion">v5.1</p>
+      <p class="version-in" id="settingsVersion">v5.2</p>
     </div>
   </div>
 </div>
@@ -356,7 +370,7 @@ body:not(.layout-pc) .topbar{font-size:9px}
   </footer>
 </main>
 
-<script src="js/questions.js?v=5.1"></script>
-<script src="js/app.js?v=5.1"></script>
+<script src="js/questions.js?v=5.2"></script>
+<script src="js/app.js?v=5.2"></script>
 </body>
 </html>
