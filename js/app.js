@@ -1,11 +1,11 @@
-/* TEST SUBJECT — App logic BUILD 5.1 */
+/* TEST SUBJECT — App logic BUILD 5.2 */
 (() => {
 'use strict';
 
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v5';
-const APP_VERSION = '5.1';
+const APP_VERSION = '5.2';
 
 const ENDING_DEFS = [
   { id: 'clean', title: 'EVALUACIÓN COMPLETADA', blurb: 'Sesión limpia. El sistema te desea una noche tranquila.' },
@@ -43,11 +43,7 @@ function initMusic() {
       a.loop = true;
       a.preload = 'auto';
       a.volume = 0.55;
-      a.setAttribute('playsinline', 'true');
-      a.setAttribute('webkit-playsinline', 'true');
-      // Precarga agresiva
-      try { a.load(); } catch (e) {}
-      a.addEventListener('canplaythrough', () => { music.calmReady = true; }, { once: true });
+      a.playsInline = true;
       music.calm = a;
     }
     if (!music.horror) {
@@ -55,25 +51,10 @@ function initMusic() {
       a.loop = true;
       a.preload = 'auto';
       a.volume = 0.6;
-      a.setAttribute('playsinline', 'true');
-      a.setAttribute('webkit-playsinline', 'true');
-      try { a.load(); } catch (e) {}
-      a.addEventListener('canplaythrough', () => { music.horrorReady = true; }, { once: true });
+      a.playsInline = true;
       music.horror = a;
     }
   } catch (e) {}
-}
-
-/** Play síncrono en el gesto del usuario (sin esperas) */
-function tryPlaySync(audio) {
-  if (!audio) return false;
-  try {
-    const p = audio.play();
-    if (p && p.catch) p.catch(() => {});
-    return true;
-  } catch (e) {
-    return false;
-  }
 }
 
 function fadeVolume(audio, to, ms) {
@@ -91,25 +72,48 @@ function fadeVolume(audio, to, ms) {
   });
 }
 
-/** Arranque inmediato de la pista calm (intro / primer gesto) */
+/**
+ * Arranca TEST.mp3 al instante dentro del gesto del usuario.
+ * Debe llamarse de forma síncrona desde un handler de click/touch.
+ */
 function startCalmInstant() {
-  if (!audioOn) return false;
   initMusic();
   ensureCtx();
+  audioOn = true;
+  saveData.settings.sound = true;
+  try { persist(); } catch (e) {}
+  music.unlocked = true;
+
   const a = music.calm;
   if (!a) return false;
-  music.unlocked = true;
+
+  // Si ya suena, listo
+  if (!a.paused && music.current === a) return true;
+
   try {
-    // Si estaba a medias, reinicia desde el principio solo si estaba parada mucho tiempo
-    if (a.paused) {
-      // no forzar currentTime=0 si ya estaba cerca del inicio y solo se cortó
-    }
+    a.muted = false;
     a.volume = 0.55;
+    if (a.readyState < 2) {
+      // Forzar buffer; play igual se intenta
+      try { a.load(); } catch (e) {}
+    }
     music.current = a;
     const p = a.play();
-    if (p && p.catch) {
-      p.catch(() => { music.unlocked = false; });
+    if (p && typeof p.then === 'function') {
+      p.then(() => {
+        music.unlocked = true;
+        hideAudioGate();
+      }).catch(() => {
+        // Fallo: recrear elemento e intentar una vez más en el mismo gesto no siempre funciona;
+        // el gate seguirá visible.
+        music.unlocked = false;
+      });
+    } else {
+      hideAudioGate();
     }
+    const st = $('soundToggle');
+    if (st) st.textContent = '♫ AUDIO: ON';
+    updateSettingsUI();
     return true;
   } catch (e) {
     music.unlocked = false;
@@ -118,7 +122,13 @@ function startCalmInstant() {
 }
 
 async function playTrack(which) {
-  if (!audioOn || !music.unlocked) return;
+  if (!audioOn) return;
+  // Si aún no hay unlock, no forzar (excepto si ya intentamos)
+  if (!music.unlocked && which === 'calm') {
+    startCalmInstant();
+    return;
+  }
+  if (!music.unlocked) return;
   initMusic();
   const next = which === 'horror' ? music.horror : music.calm;
   const prev = music.current;
@@ -126,34 +136,31 @@ async function playTrack(which) {
   if (prev === next && !prev.paused) return;
   try {
     const targetVol = which === 'horror' ? 0.6 : 0.55;
-
-    // Primera pista (nada sonando): instantáneo, sin fade
     if (!prev || prev.paused) {
       next.volume = targetVol;
       music.current = next;
-      tryPlaySync(next);
+      const p = next.play();
+      if (p && p.catch) p.catch(() => {});
       return;
     }
-
-    // Cambio calm → horror: breve silencio + entrada
     if (which === 'horror' && prev !== next) {
       await fadeVolume(prev, 0, 350);
       try { prev.pause(); prev.currentTime = 0; } catch (e) {}
       await new Promise(r => setTimeout(r, 400));
       next.volume = targetVol;
       music.current = next;
-      tryPlaySync(next);
+      const p = next.play();
+      if (p && p.catch) p.catch(() => {});
       return;
     }
-
-    // Cambio horror → calm (vuelta a intro)
     if (prev && prev !== next && !prev.paused) {
       await fadeVolume(prev, 0, 300);
       try { prev.pause(); prev.currentTime = 0; } catch (e) {}
     }
     next.volume = targetVol;
     music.current = next;
-    tryPlaySync(next);
+    const p = next.play();
+    if (p && p.catch) p.catch(() => {});
   } catch (e) {}
 }
 
@@ -167,6 +174,45 @@ function stopAllMusic() {
 
 function unlockAndStartCalm() {
   startCalmInstant();
+}
+
+function hideAudioGate() {
+  const g = $('audioGate');
+  if (!g || g.classList.contains('hide')) return;
+  g.classList.add('hide');
+  setTimeout(() => { try { g.style.display = 'none'; } catch (e) {} }, 400);
+}
+
+function armAudioGate() {
+  const g = $('audioGate');
+  const btn = $('audioGateBtn');
+  // Si el audio ya está permitido y suena, no mostrar
+  if (music.calm && !music.calm.paused) {
+    hideAudioGate();
+    return;
+  }
+  function activate(ev) {
+    if (ev) {
+      try { ev.preventDefault(); } catch (e) {}
+      try { ev.stopPropagation(); } catch (e) {}
+    }
+    startCalmInstant();
+    // Segundo intento tras un frame (algunos navegadores móviles)
+    requestAnimationFrame(() => startCalmInstant());
+    setTimeout(() => {
+      if (music.calm && music.calm.paused) startCalmInstant();
+      else hideAudioGate();
+    }, 120);
+    hideAudioGate();
+  }
+  if (g) {
+    g.addEventListener('pointerdown', activate, { once: true });
+    g.addEventListener('click', activate, { once: true });
+  }
+  if (btn) {
+    btn.addEventListener('pointerdown', activate, { once: true });
+    btn.addEventListener('click', activate, { once: true });
+  }
 }
 
 function defaultSave() {
@@ -215,13 +261,10 @@ function applySoundSetting(on) {
   const st = $('soundToggle');
   if (st) st.textContent = '♫ AUDIO: ' + (audioOn ? 'ON' : 'OFF');
   if (audioOn) {
-    music.unlocked = true;
-    initMusic();
-    ensureCtx();
+    startCalmInstant();
     sound('good');
     startAmbient();
     if (started && (horrorMusicStarted || unsettling >= 5 || idx >= 8)) playTrack('horror');
-    else playTrack('calm');
   } else {
     stopAmbient();
     stopAllMusic();
@@ -1247,11 +1290,13 @@ applyLayout(saveData.settings.layout || 'auto');
 // Primera vez / tras borrado: audio activado
 let freshBoot = false;
 try { freshBoot = sessionStorage.getItem('ts09_fresh') === '1'; sessionStorage.removeItem('ts09_fresh'); } catch (e) {}
-if (!saveData.playCount || freshBoot) {
+// Audio ON por defecto (el gate pide el toque)
+if (freshBoot || saveData.settings.sound !== false) {
   saveData.settings.sound = true;
   persist();
 }
-audioOn = !!saveData.settings.sound;
+audioOn = saveData.settings.sound !== false;
+
 const st = $('soundToggle');
 if (st) st.textContent = '♫ AUDIO: ' + (audioOn ? 'ON' : 'OFF');
 updateSettingsUI();
@@ -1264,28 +1309,13 @@ if (sv) sv.textContent = 'TEST SUBJECT  ·  v' + APP_VERSION;
 
 initMusic();
 
-function tryUnlockAudio() {
-  if (!audioOn) return false;
-  if (started) {
-    music.unlocked = true;
-    return true;
-  }
-  // Si ya suena, no tocar
-  if (music.calm && !music.calm.paused) {
-    music.unlocked = true;
-    return true;
-  }
-  return startCalmInstant();
-}
-// Primer gesto = música al momento (pointerdown es el más rápido en móvil)
-['pointerdown', 'touchstart', 'keydown'].forEach(ev => {
-  document.addEventListener(ev, () => {
-    if (!audioOn) return;
-    if (!music.unlocked || (music.calm && music.calm.paused && !started)) {
-      tryUnlockAudio();
-    }
-  }, { capture: true, passive: true });
-});
+// Gate de audio: el usuario debe tocar una vez (política del navegador)
+armAudioGate();
+// También desbloquear al abrir ajustes o iniciar
+on($('settingsOpen'), 'pointerdown', () => { if (audioOn) startCalmInstant(); });
+on($('settingsOpen2'), 'pointerdown', () => { if (audioOn) startCalmInstant(); });
+on($('startBtn'), 'pointerdown', () => { startCalmInstant(); });
+
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
