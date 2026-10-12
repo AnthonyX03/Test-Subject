@@ -1,11 +1,11 @@
-/* TEST SUBJECT — App logic BUILD 5.0 */
+/* TEST SUBJECT — App logic BUILD 5.1 */
 (() => {
 'use strict';
 
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v5';
-const APP_VERSION = '5.0';
+const APP_VERSION = '5.1';
 
 const ENDING_DEFS = [
   { id: 'clean', title: 'EVALUACIÓN COMPLETADA', blurb: 'Sesión limpia. El sistema te desea una noche tranquila.' },
@@ -39,31 +39,40 @@ const music = { calm: null, horror: null, current: null, unlocked: false };
 function initMusic() {
   try {
     if (!music.calm) {
-      music.calm = new Audio('audio/TEST.mp3');
-      music.calm.loop = true;
-      music.calm.preload = 'auto';
-      music.calm.volume = 0.55;
+      const a = new Audio('audio/TEST.mp3');
+      a.loop = true;
+      a.preload = 'auto';
+      a.volume = 0.55;
+      a.setAttribute('playsinline', 'true');
+      a.setAttribute('webkit-playsinline', 'true');
+      // Precarga agresiva
+      try { a.load(); } catch (e) {}
+      a.addEventListener('canplaythrough', () => { music.calmReady = true; }, { once: true });
+      music.calm = a;
     }
     if (!music.horror) {
-      music.horror = new Audio('audio/TESTHORROR.mp3');
-      music.horror.loop = true;
-      music.horror.preload = 'auto';
-      music.horror.volume = 0.6;
+      const a = new Audio('audio/TESTHORROR.mp3');
+      a.loop = true;
+      a.preload = 'auto';
+      a.volume = 0.6;
+      a.setAttribute('playsinline', 'true');
+      a.setAttribute('webkit-playsinline', 'true');
+      try { a.load(); } catch (e) {}
+      a.addEventListener('canplaythrough', () => { music.horrorReady = true; }, { once: true });
+      music.horror = a;
     }
   } catch (e) {}
 }
 
-/** Intenta reproducir; devuelve true si el navegador lo permite */
-function tryPlay(audio) {
-  if (!audio) return Promise.resolve(false);
+/** Play síncrono en el gesto del usuario (sin esperas) */
+function tryPlaySync(audio) {
+  if (!audio) return false;
   try {
     const p = audio.play();
-    if (p && p.then) {
-      return p.then(() => true).catch(() => false);
-    }
-    return Promise.resolve(true);
+    if (p && p.catch) p.catch(() => {});
+    return true;
   } catch (e) {
-    return Promise.resolve(false);
+    return false;
   }
 }
 
@@ -71,7 +80,7 @@ function fadeVolume(audio, to, ms) {
   if (!audio) return Promise.resolve();
   return new Promise(resolve => {
     const from = audio.volume;
-    const steps = Math.max(8, Math.floor(ms / 40));
+    const steps = Math.max(4, Math.floor(ms / 40));
     let i = 0;
     const id = setInterval(() => {
       i++;
@@ -82,6 +91,32 @@ function fadeVolume(audio, to, ms) {
   });
 }
 
+/** Arranque inmediato de la pista calm (intro / primer gesto) */
+function startCalmInstant() {
+  if (!audioOn) return false;
+  initMusic();
+  ensureCtx();
+  const a = music.calm;
+  if (!a) return false;
+  music.unlocked = true;
+  try {
+    // Si estaba a medias, reinicia desde el principio solo si estaba parada mucho tiempo
+    if (a.paused) {
+      // no forzar currentTime=0 si ya estaba cerca del inicio y solo se cortó
+    }
+    a.volume = 0.55;
+    music.current = a;
+    const p = a.play();
+    if (p && p.catch) {
+      p.catch(() => { music.unlocked = false; });
+    }
+    return true;
+  } catch (e) {
+    music.unlocked = false;
+    return false;
+  }
+}
+
 async function playTrack(which) {
   if (!audioOn || !music.unlocked) return;
   initMusic();
@@ -90,25 +125,35 @@ async function playTrack(which) {
   if (!next) return;
   if (prev === next && !prev.paused) return;
   try {
-    if (prev && prev !== next && !prev.paused) {
-      await fadeVolume(prev, 0, 600);
-      try { prev.pause(); prev.currentTime = 0; } catch (e) {}
-    }
-    if (which === 'horror' && prev && prev !== next) {
-      await new Promise(r => setTimeout(r, 700));
-    }
     const targetVol = which === 'horror' ? 0.6 : 0.55;
-    next.volume = targetVol;
-    music.current = next;
-    const ok = await tryPlay(next);
-    if (!ok) {
-      // Autoplay bloqueado: reintentar en el próximo gesto
-      music.unlocked = false;
+
+    // Primera pista (nada sonando): instantáneo, sin fade
+    if (!prev || prev.paused) {
+      next.volume = targetVol;
+      music.current = next;
+      tryPlaySync(next);
       return;
     }
-    // Fade suave solo si ya suena
-    next.volume = Math.min(next.volume, 0.15);
-    await fadeVolume(next, targetVol, 700);
+
+    // Cambio calm → horror: breve silencio + entrada
+    if (which === 'horror' && prev !== next) {
+      await fadeVolume(prev, 0, 350);
+      try { prev.pause(); prev.currentTime = 0; } catch (e) {}
+      await new Promise(r => setTimeout(r, 400));
+      next.volume = targetVol;
+      music.current = next;
+      tryPlaySync(next);
+      return;
+    }
+
+    // Cambio horror → calm (vuelta a intro)
+    if (prev && prev !== next && !prev.paused) {
+      await fadeVolume(prev, 0, 300);
+      try { prev.pause(); prev.currentTime = 0; } catch (e) {}
+    }
+    next.volume = targetVol;
+    music.current = next;
+    tryPlaySync(next);
   } catch (e) {}
 }
 
@@ -121,20 +166,7 @@ function stopAllMusic() {
 }
 
 function unlockAndStartCalm() {
-  music.unlocked = true;
-  initMusic();
-  ensureCtx();
-  if (audioOn) {
-    // Reproducción directa en el gesto del usuario (más fiable que async)
-    const a = music.calm;
-    if (a) {
-      a.volume = 0.55;
-      music.current = a;
-      tryPlay(a).then(ok => {
-        if (!ok) music.unlocked = false;
-      });
-    }
-  }
+  startCalmInstant();
 }
 
 function defaultSave() {
@@ -1194,6 +1226,21 @@ function wireUI() {
   });
 }
 
+
+// Precarga en caliente de los MP3 (móvil/PWA)
+(function prefetchAudio() {
+  ['audio/TEST.mp3', 'audio/TESTHORROR.mp3'].forEach(src => {
+    try {
+      fetch(src, { cache: 'force-cache' }).catch(() => {});
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'audio';
+      link.href = src;
+      document.head.appendChild(link);
+    } catch (e) {}
+  });
+})();
+
 initMusic();
 wireUI();
 applyLayout(saveData.settings.layout || 'auto');
@@ -1219,23 +1266,22 @@ initMusic();
 
 function tryUnlockAudio() {
   if (!audioOn) return false;
-  music.unlocked = true;
-  initMusic();
-  ensureCtx();
-  const a = music.calm;
-  if (!a) return false;
-  if (!started) {
-    if (music.current === a && !a.paused) return true;
-    a.volume = 0.55;
-    music.current = a;
-    tryPlay(a);
+  if (started) {
+    music.unlocked = true;
+    return true;
   }
-  return true;
+  // Si ya suena, no tocar
+  if (music.calm && !music.calm.paused) {
+    music.unlocked = true;
+    return true;
+  }
+  return startCalmInstant();
 }
-// Cualquier gesto puede desbloquear (autoplay policy)
-['pointerdown', 'click', 'touchstart', 'keydown'].forEach(ev => {
+// Primer gesto = música al momento (pointerdown es el más rápido en móvil)
+['pointerdown', 'touchstart', 'keydown'].forEach(ev => {
   document.addEventListener(ev, () => {
-    if (audioOn && (!music.unlocked || (music.calm && music.calm.paused && !started))) {
+    if (!audioOn) return;
+    if (!music.unlocked || (music.calm && music.calm.paused && !started)) {
       tryUnlockAudio();
     }
   }, { capture: true, passive: true });
