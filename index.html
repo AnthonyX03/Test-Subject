@@ -292,7 +292,7 @@ body{background:var(--bg)!important;color:var(--text)}
 .sup-face-mini{display:flex;flex-direction:column;align-items:center;font-size:10px;line-height:1.1;color:var(--green);min-width:28px}
 .sup-hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px;letter-spacing:.08em}
 .sup-hud strong{display:block;font-size:15px;color:var(--green)}
-.sup-map-wrap{position:relative;width:100%;aspect-ratio:1.15/1;border:1px solid var(--border);background:radial-gradient(ellipse at center,#0a120e 0%,#030605 70%);overflow:hidden}
+.sup-map-wrap{position:relative;width:100%;max-height:min(42vh,320px);aspect-ratio:1.55/1;border:1px solid var(--border);background:radial-gradient(ellipse at center,#0a120e 0%,#030605 70%);overflow:hidden;margin:0 auto}
 .sup-edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.45}
 .sup-edges line{stroke:var(--border);stroke-width:.4}
 .sup-nodes{position:absolute;inset:0;pointer-events:none}
@@ -372,7 +372,14 @@ body{background:var(--bg)!important;color:var(--text)}
 .audio-gate.hide{opacity:0;pointer-events:none}
 .audio-gate.soft{background:#050806aa}
 
-</style>
+
+.sup-typing{font-size:11px;color:var(--muted);letter-spacing:.12em;opacity:.7;animation:blink 1.2s ease infinite}
+.sup-face-box.talk .sup-mouth{animation:blink 0.35s ease infinite}
+.sup-face-mini.talk span:last-child{animation:blink 0.35s ease infinite}
+.sup-node{font-size:8px;padding:3px 5px}
+.sup-unit{width:32px;height:32px;font-size:8px}
+.sup-brief-type{min-height:4.5em}
+
 </head>
 <body>
 <div class="audio-gate" id="audioGate" role="button" tabindex="0" aria-label="Activar audio">
@@ -381,7 +388,7 @@ body{background:var(--bg)!important;color:var(--text)}
   <div class="ag-sub">El navegador bloquea el sonido hasta un toque. Después la música arranca sola.</div>
 </div>
 
-<div class="version-badge" id="versionBadge">v8.3</div>
+<div class="version-badge" id="versionBadge">v8.6</div>
 <div class="noise" id="noise"></div>
 <div class="scanline-extra" id="scanExtra"></div>
 <div class="vignette-pulse" id="vignette"></div>
@@ -448,7 +455,7 @@ body{background:var(--bg)!important;color:var(--text)}
       <div class="close-row">
         <button type="button" class="button" id="settingsClose">CERRAR</button>
       </div>
-      <p class="version-in" id="settingsVersion">v8.3</p>
+      <p class="version-in" id="settingsVersion">v8.6</p>
     </div>
   </div>
 </div>
@@ -635,6 +642,7 @@ body{background:var(--bg)!important;color:var(--text)}
       <div class="controls">
         <button class="button" id="startBtn">INICIAR EVALUACIÓN →</button>
         <button class="button" id="introEndingsBtn">FINALES <span id="endingCountIntro">(0)</span></button>
+        <button class="button" id="introUnitsBtn">UNIDADES</button>
         <button class="button" id="introExtraBtn">EXTRA</button>
         <button class="button" id="settingsOpen2">⚙ AJUSTES</button>
         <button class="button" id="supervisorBtn">MODO SUPERVISOR</button>
@@ -682,7 +690,6 @@ body{background:var(--bg)!important;color:var(--text)}
 
         <div class="sup-actions">
           <button class="button" id="supDoorBtn">CERRAR PUERTA</button>
-          <button class="button" id="supCamToggle">CÁMARAS: OFF</button>
           <span class="sup-door-pill" id="supDoorLabel">PUERTA ABIERTA</span>
           <button class="button" id="supAbortPlay" style="border-color:#6a3030;color:#ff9090">ABORTAR</button>
         </div>
@@ -770,11 +777,11 @@ body{background:var(--bg)!important;color:var(--text)}
   </footer>
 </main>
 
-<script src="js/units.js?v=8.3"></script>
-<script src="js/supervisor.js?v=8.3"></script>
-<script src="js/minigames.js?v=8.3"></script>
-<script src="js/documents.js?v=8.3"></script>
-<script src="js/questions.js?v=8.3"></script>
-<script src="js/app.js?v=8.3"></script>
+<script src="js/units.js?v=8.6"></script>
+<script src="js/supervisor.js?v=8.6"></script>
+<script src="js/minigames.js?v=8.6"></script>
+<script src="js/documents.js?v=8.6"></script>
+<script src="js/questions.js?v=8.6"></script>
+<script src="js/app.js?v=8.6"></script>
 </body>
 </html>
