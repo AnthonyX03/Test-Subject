@@ -5,7 +5,7 @@
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v7';
-const APP_VERSION = '8.7';
+const APP_VERSION = '9.0';
 
 function getUnitEndings() {
   const u = getActiveUnit();
@@ -331,6 +331,24 @@ function armAudioGate() {
     btn.addEventListener('pointerdown', activate, { once: true });
     btn.addEventListener('click', activate, { once: true });
   }
+}
+
+
+function ensureStarterCards() {
+  if (!window.TSCards) return;
+  saveData.cards = saveData.cards || [];
+  TSCards.STARTER_IDS.forEach(id => {
+    if (!saveData.cards.includes(id)) saveData.cards.push(id);
+  });
+}
+function getDeck() {
+  ensureStarterCards();
+  // up to 20 cards from collection; if fewer, pad with starters
+  let d = (saveData.cards || []).slice();
+  if (d.length < 8 && window.TSCards) {
+    TSCards.STARTER_IDS.forEach(id => { if (!d.includes(id)) d.push(id); });
+  }
+  return d.slice(0, 24);
 }
 
 function defaultSave() {
@@ -1022,6 +1040,7 @@ function begin() {
   horrorMusicStarted = false;
   document.body.classList.remove('corrupt', 'redmode', 'voidmode', 'glitch');
   applyUnitTheme();
+ensureStarterCards();
 refreshSupervisorBtn();
 
   const picked = window.TSQuestions.pickSessionQuestions(Object.assign({}, saveData.past, { playCount: saveData.playCount }), 20, saveData.activeUnit || 'u04');
@@ -1600,7 +1619,8 @@ function openShop(tab) {
   const tabs = document.createElement('div');
   tabs.className = 'shop-tabs';
   tabs.innerHTML = '<button type="button" class="tab' + (shopTab==='docs'?' active':'') + '" data-t="docs">DOCUMENTOS</button>' +
-    '<button type="button" class="tab' + (shopTab==='units'?' active':'') + '" data-t="units">UNIDADES</button>';
+    '<button type="button" class="tab' + (shopTab==='units'?' active':'') + '" data-t="units">UNIDADES</button>' +
+    '<button type="button" class="tab' + (shopTab==='packs'?' active':'') + '" data-t="packs">SOBRES</button>';
   tabs.querySelectorAll('.tab').forEach(b => {
     b.onclick = () => openShop(b.dataset.t);
   });
@@ -1634,7 +1654,7 @@ function openShop(tab) {
       }
       list.appendChild(div);
     });
-  } else if (window.TSUnits) {
+  } else if (shopTab === 'units' && window.TSUnits) {
     TSUnits.listUnits().slice().sort((a,b)=>Number(a.code)-Number(b.code)).forEach(u => {
       if (u.id === 'u04') return;
       const owned = (saveData.unlockedUnits || []).includes(u.id);
@@ -1642,7 +1662,9 @@ function openShop(tab) {
       const col = (u.colors && u.colors.green) || '#7dff9a';
       const div = document.createElement('div');
       div.className = 'shop-item unit-item';
-      div.innerHTML = '<div class="unit-face" style="border-color:' + col + ';color:' + col + '"><div class="uf-eyes">' + face.eyes + '</div><div>' + face.mouth + '</div></div>' +
+      div.innerHTML = '<div class="unit-face face-frame sm" style="border-color:' + col + ';color:' + col + ';--green:' + col + '">' +
+        '<div class="ff-scan"></div><div class="uf-eyes ff-eyes">' + face.eyes + '</div>' +
+        '<div class="uf-mouth ff-mouth">' + face.mouth + '</div></div>' +
         '<div class="unit-body"><div class="dtitle">' + u.name + ' — ' + u.title + '</div><div class="dcat">' + u.shopBlurb + '</div>' +
         '<div class="price">' + (owned ? 'DESBLOQUEADA' : (u.unlock + ' CE')) + '</div></div>';
       if (!owned) {
@@ -1666,6 +1688,43 @@ function openShop(tab) {
       list.appendChild(div);
     });
   }
+
+  if (shopTab === 'packs' && window.TSCards) {
+    ensureStarterCards();
+    TSCards.PACKS.forEach(pack => {
+      const div = document.createElement('div');
+      div.className = 'pack-item';
+      div.innerHTML = '<div class="dtitle">' + pack.name + '</div>' +
+        '<div class="dcat">' + pack.count + ' cartas aleatorias</div>' +
+        '<div class="price">' + pack.price + ' CE</div>';
+      const btn = document.createElement('button');
+      btn.className = 'button';
+      btn.textContent = 'ABRIR SOBRE';
+      btn.style.marginTop = '8px';
+      btn.onclick = () => {
+        if ((saveData.ce || 0) < pack.price) { showSysMsg('CE INSUFICIENTES', 2000, true); return; }
+        saveData.ce -= pack.price;
+        const got = TSCards.openPack(pack.id);
+        saveData.cards = saveData.cards || [];
+        const names = [];
+        got.forEach(c => {
+          if (!saveData.cards.includes(c.id)) saveData.cards.push(c.id);
+          names.push(c.name);
+        });
+        persist();
+        updateCEUI();
+        openShop('packs');
+        showSysMsg('SOBRE: ' + names.join(' · '), 3500);
+      };
+      div.appendChild(btn);
+      list.appendChild(div);
+    });
+    const info = document.createElement('p');
+    info.className = 'hint';
+    info.textContent = 'Colección: ' + (saveData.cards || []).length + ' / ' + TSCards.count + ' cartas.';
+    list.appendChild(info);
+  }
+
   const m = $('shopModal');
   if (m) m.classList.add('open');
 }
@@ -1682,8 +1741,10 @@ function openUnits() {
     const col = (u.colors && u.colors.green) || '#7dff9a';
     const div = document.createElement('div');
     div.className = 'unit-item';
-    div.innerHTML = '<div class="unit-face" style="border-color:' + col + ';color:' + col + ';opacity:' + (owned ? '1' : '.4') + '">' +
-      '<div class="uf-eyes">' + face.eyes + '</div><div>' + face.mouth + '</div></div>' +
+    div.innerHTML = '<div class="unit-face face-frame sm" style="border-color:' + col + ';color:' + col + ';opacity:' + (owned ? '1' : '.4') + ';--green:' + col + '">' +
+      '<div class="ff-scan"></div>' +
+      '<div class="uf-eyes ff-eyes">' + face.eyes + '</div>' +
+      '<div class="uf-mouth ff-mouth">' + face.mouth + '</div></div>' +
       '<div class="unit-body"><div class="dtitle">' + u.name + (active ? ' · ACTIVA' : '') + '</div>' +
       '<div class="dcat">' + u.title + '</div><div class="price">' + (owned ? 'Disponible' : ('Bloqueada · ' + u.unlock + ' CE en tienda')) + '</div></div>';
     if (owned && !active) {
@@ -1695,6 +1756,7 @@ function openUnits() {
         saveData.activeUnit = u.id;
         persist();
         applyUnitTheme();
+ensureStarterCards();
         updateSettingsUI();
         openUnits();
         showSysMsg(u.name + ' ACTIVA', 2000);
@@ -1922,6 +1984,13 @@ function setSupFace(level) {
     if (e) e.textContent = f.eyes;
     if (m) m.textContent = f.mouth;
   });
+  ['supFaceBrief', 'supFaceMini', 'supFaceEnd'].forEach(id => {
+    const box = $(id);
+    if (!box) return;
+    box.classList.remove('mid', 'horror');
+    if (level === 'mid') box.classList.add('mid');
+    if (level === 'horror') box.classList.add('horror');
+  });
 }
 
 function appendSupLog(logId, text, cls) {
@@ -1991,6 +2060,213 @@ function typeSupLineNow(logId, fullText, cls, speed) {
   });
 }
 
+
+
+const DEPT_INTRO = {
+  invest: {
+    title: 'INVESTIGACIÓN',
+    body: 'Sector principal de la U.E.C.\n\nAquí las Unidades no pelean: preguntan. Veinte registros por sesión, memoria residual entre partidas, documentos que se desbloquean al hablar de más.\n\nTu Unidad activa marca el tono, el color y el banco de preguntas.\n\nProtocolo 09. Modo aislado.'
+  },
+  cont: {
+    title: 'CONTINGENCIA',
+    body: 'Cuando la entrevista no basta, el archivo autoriza contención directa.\n\nUn combate 1 contra 1. Tú con un mazo de cartas de tropa; la Unidad con su integridad y sus patrones.\n\nVacía su barra. Sobrevive a la suya.\n\nLos sobres de la tienda amplían tu colección. Las cartas iniciales ya están en tu archivo.'
+  },
+  sup: {
+    title: 'SUPERVISOR',
+    body: 'Terminal de vigilancia. No es una entrevista ni un duelo de cartas.\n\nObservas el mapa. Cierras la puerta. Escuchas al Supervisor —que a veces ayuda y a veces no—.\n\nSeis minutos por sesión. Una Unidad más cada noche.\n\nRequiere las cinco Unidades desbloqueadas.'
+  }
+};
+let pendingDept = null;
+
+function openDepartments() {
+  const m = $('deptModal');
+  const sup = $('deptSup');
+  if (sup) {
+    if (allUnitsUnlocked()) {
+      sup.classList.remove('locked');
+    } else {
+      sup.classList.add('locked');
+    }
+  }
+  if (m) m.classList.add('open');
+}
+function closeDepartments() {
+  const m = $('deptModal');
+  if (m) m.classList.remove('open');
+}
+function showDeptIntro(key) {
+  pendingDept = key;
+  const d = DEPT_INTRO[key];
+  if (!d) return;
+  const t = $('deptIntroTitle');
+  const b = $('deptIntroBody');
+  if (t) t.textContent = '◈ ' + d.title;
+  if (b) b.textContent = d.body;
+  const m = $('deptIntroModal');
+  if (m) m.classList.add('open');
+  closeDepartments();
+}
+function closeDeptIntro() {
+  const m = $('deptIntroModal');
+  if (m) m.classList.remove('open');
+}
+function enterPendingDept() {
+  closeDeptIntro();
+  const key = pendingDept;
+  pendingDept = null;
+  if (key === 'invest') begin();
+  else if (key === 'cont') enterContingency();
+  else if (key === 'sup') {
+    if (!allUnitsUnlocked()) {
+      showSysMsg('REQUIERE LAS 5 UNIDADES', 2500, true);
+      return;
+    }
+    enterSupervisorMode();
+  }
+}
+
+/* ——— CONTINGENCIA ——— */
+let contState = null;
+let contSelectedUnit = 'u01';
+
+function enterContingency() {
+  stopAllMusic();
+  if (audioOn) playTrack('calm');
+  const intro = $('intro'), game = $('game'), ending = $('ending'), sup = $('supScreen'), cont = $('contScreen');
+  if (intro) intro.style.display = 'none';
+  if (game) game.style.display = 'none';
+  if (ending) { ending.classList.add('hidden'); ending.style.display = 'none'; }
+  if (sup) { sup.classList.remove('active'); sup.style.display = 'none'; }
+  if (cont) { cont.classList.add('active'); cont.style.display = 'flex'; }
+  showContLobby();
+}
+function exitContingency() {
+  contState = null;
+  const cont = $('contScreen');
+  if (cont) { cont.classList.remove('active'); cont.style.display = 'none'; }
+  const intro = $('intro');
+  if (intro) intro.style.display = '';
+  if (audioOn) unlockAndStartCalm();
+}
+function showContLobby() {
+  $('contLobby').style.display = '';
+  $('contBattle').style.display = 'none';
+  $('contResult').style.display = 'none';
+  const box = $('contUnitSelect');
+  if (!box || !window.TSUnits) return;
+  box.innerHTML = '';
+  ensureStarterCards();
+  const di = $('contDeckInfo');
+  if (di) di.textContent = 'Cartas en archivo: ' + (saveData.cards || []).length + ' · Mazo: ' + getDeck().length;
+  TSUnits.listUnits().slice().sort((a,b)=>Number(a.code)-Number(b.code)).forEach(u => {
+    const owned = (saveData.unlockedUnits || ['u04']).includes(u.id);
+    const btn = document.createElement('button');
+    btn.className = 'button';
+    btn.textContent = u.name + (owned ? '' : ' 🔒');
+    btn.disabled = !owned;
+    if (u.id === contSelectedUnit) btn.style.borderColor = 'var(--green)';
+    btn.onclick = () => {
+      contSelectedUnit = u.id;
+      showContLobby();
+    };
+    box.appendChild(btn);
+  });
+}
+function startContBattle() {
+  if (!window.TSContingency || !window.TSCards) return;
+  const deck = getDeck();
+  if (deck.length < 5) {
+    showSysMsg('MAZO INSUFICIENTE — COMPRA SOBRES', 2500, true);
+    return;
+  }
+  contState = TSContingency.createBattle(contSelectedUnit, deck);
+  TSContingency.startTurn(contState);
+  $('contLobby').style.display = 'none';
+  $('contResult').style.display = 'none';
+  $('contBattle').style.display = '';
+  // enemy face color
+  const uc = (TSContingency.UNIT_COMBAT[contSelectedUnit] || {});
+  const ef = $('contEnemyFace');
+  if (ef && uc.color) {
+    ef.style.borderColor = uc.color;
+    ef.style.color = uc.color;
+  }
+  renderContBattle();
+}
+function renderContBattle() {
+  if (!contState) return;
+  const s = contState;
+  const pf = $('contPFill'), ef = $('contEFill');
+  if (pf) pf.style.width = (100 * s.playerHp / s.playerMax) + '%';
+  if (ef) ef.style.width = (100 * s.enemyHp / s.enemyMax) + '%';
+  const php = $('contPHP'), ehp = $('contEHP'), en = $('contEName');
+  if (php) php.textContent = s.playerHp + '/' + s.playerMax + (s.shield ? (' · G' + s.shield) : '');
+  if (ehp) ehp.textContent = s.enemyHp + '/' + s.enemyMax + (s.enemyShield ? (' · G' + s.enemyShield) : '');
+  if (en) en.textContent = s.unitName;
+  const energy = $('contEnergy'), turn = $('contTurn');
+  if (energy) energy.textContent = 'ENERGÍA ' + s.energy + '/' + s.maxEnergy;
+  if (turn) turn.textContent = 'TURNO ' + s.turn;
+  const log = $('contLog');
+  if (log) {
+    log.innerHTML = s.log.slice(-10).map(l =>
+      '<div class="' + l.who + '">' + l.t + '</div>'
+    ).join('');
+    log.scrollTop = log.scrollHeight;
+  }
+  const hand = $('contHand');
+  if (hand) {
+    hand.innerHTML = '';
+    s.hand.forEach((id, i) => {
+      const c = TSCards.getCard(id);
+      if (!c) return;
+      const div = document.createElement('div');
+      div.className = 'cont-card r-' + c.rarity;
+      div.innerHTML = '<div class="cn">' + c.icon + ' ' + c.name + '</div>' +
+        '<div class="cm">' + c.label + ' · coste ' + c.cost + '</div>' +
+        '<div class="cst">' + (c.dmg ? ('DMG ' + c.dmg + ' ') : '') +
+        (c.shield ? ('G+' + c.shield + ' ') : '') +
+        (c.heal ? ('H+' + c.heal + ' ') : '') +
+        (c.drain ? ('DR ' + c.drain + ' ') : '') +
+        (c.debuff ? ('DEB ' + c.debuff) : '') + '</div>';
+      div.onclick = () => {
+        const r = TSContingency.playCard(s, i);
+        if (!r.ok) {
+          if (r.reason === 'energía') showSysMsg('SIN ENERGÍA', 1200, true);
+          return;
+        }
+        renderContBattle();
+        if (s.over) endContBattle();
+      };
+      hand.appendChild(div);
+    });
+  }
+}
+function contEndTurn() {
+  if (!contState || contState.over) return;
+  TSContingency.endTurn(contState);
+  renderContBattle();
+  if (contState.over) endContBattle();
+}
+function endContBattle() {
+  if (!contState) return;
+  $('contBattle').style.display = 'none';
+  $('contResult').style.display = '';
+  const title = $('contResultTitle');
+  const text = $('contResultText');
+  if (contState.won) {
+    if (title) title.textContent = 'CONTENCIÓN EXITOSA';
+    const reward = 12 + contState.turn;
+    saveData.ce = (saveData.ce || 0) + reward;
+    saveData.contWins = saveData.contWins || {};
+    saveData.contWins[contState.unitId] = (saveData.contWins[contState.unitId] || 0) + 1;
+    persist();
+    updateCEUI();
+    if (text) text.textContent = contState.unitName + ' contenida. +' + reward + ' CE transferidos.';
+  } else {
+    if (title) title.textContent = 'RECUPERADO';
+    if (text) text.textContent = 'Tu integridad llegó a cero. El archivo marca el intento como fallido.';
+  }
+}
 
 function enterSupervisorMode() {
   if (!allUnitsUnlocked()) {
@@ -2253,6 +2529,25 @@ function sendSupChat() {
 
 function wireUI() {
 
+  on($('deptBtn'), 'click', openDepartments);
+  on($('deptClose'), 'click', closeDepartments);
+  on($('deptModal'), 'click', e => { if (e.target === $('deptModal')) closeDepartments(); });
+  on($('deptInvest'), 'click', () => showDeptIntro('invest'));
+  on($('deptCont'), 'click', () => showDeptIntro('cont'));
+  on($('deptSup'), 'click', () => {
+    if (!allUnitsUnlocked()) { showSysMsg('REQUIERE LAS 5 UNIDADES', 2200, true); return; }
+    showDeptIntro('sup');
+  });
+  on($('deptIntroGo'), 'click', enterPendingDept);
+  on($('deptIntroBack'), 'click', () => { closeDeptIntro(); openDepartments(); });
+  on($('contBackBtn'), 'click', exitContingency);
+  on($('contStartBtn'), 'click', startContBattle);
+  on($('contEndTurn'), 'click', contEndTurn);
+  on($('contFlee'), 'click', () => { contState = null; showContLobby(); });
+  on($('contAgain'), 'click', showContLobby);
+  on($('contExit'), 'click', exitContingency);
+
+
   const vb = $('versionBadge');
   if (vb) {
     vb.style.pointerEvents = 'auto';
@@ -2446,6 +2741,7 @@ updateCEUI();
 if (!saveData.unlockedUnits) saveData.unlockedUnits = ['u04'];
 if (!saveData.activeUnit) saveData.activeUnit = 'u04';
 applyUnitTheme();
+ensureStarterCards();
 
 
 
