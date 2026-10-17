@@ -380,6 +380,117 @@ body{background:var(--bg)!important;color:var(--text)}
 .sup-unit{width:32px;height:32px;font-size:8px}
 .sup-brief-type{min-height:4.5em}
 
+
+/* Recuadro de cara estilo terminal */
+.face-frame{
+  position:relative;
+  width:72px;height:76px;
+  border:1px solid var(--border,#2a4a32);
+  background:linear-gradient(180deg,#0a140e 0%,#050a08 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  box-shadow:inset 0 0 18px #000a, 0 0 12px color-mix(in srgb, var(--green,#7dff9a) 18%, transparent);
+  flex-shrink:0;
+}
+.face-frame:before,.face-frame:after{
+  content:"";position:absolute;width:8px;height:8px;border-color:var(--green,#7dff9a);border-style:solid;opacity:.7;
+}
+.face-frame:before{top:3px;left:3px;border-width:1px 0 0 1px}
+.face-frame:after{bottom:3px;right:3px;border-width:0 1px 1px 0}
+.face-frame .ff-scan{
+  position:absolute;left:0;right:0;height:2px;background:var(--green,#7dff9a);opacity:.15;
+  animation:ffScan 2.8s linear infinite;pointer-events:none;
+}
+@keyframes ffScan{0%{top:8%}100%{top:90%}}
+.face-frame .ff-eyes{font-size:15px;letter-spacing:.28em;color:var(--green,#7dff9a);line-height:1}
+.face-frame .ff-mouth{font-size:14px;color:var(--green,#7dff9a);line-height:1;min-height:1em}
+.face-frame.talk .ff-mouth{animation:mouthTalk .28s steps(2) infinite}
+@keyframes mouthTalk{
+  0%{transform:scaleY(1);opacity:1}
+  50%{transform:scaleY(.55);opacity:.85}
+  100%{transform:scaleY(1);opacity:1}
+}
+.face-frame.mid{border-color:#8a8a40;box-shadow:inset 0 0 18px #000a,0 0 12px #8a8a4033}
+.face-frame.mid .ff-eyes,.face-frame.mid .ff-mouth{color:#c8c860}
+.face-frame.horror{border-color:#8a3030;box-shadow:inset 0 0 18px #200808,0 0 14px #6a202055}
+.face-frame.horror .ff-eyes,.face-frame.horror .ff-mouth{color:#ff9090}
+.face-frame.sm{width:52px;height:56px}
+.face-frame.sm .ff-eyes{font-size:12px;letter-spacing:.2em}
+.face-frame.sm .ff-mouth{font-size:11px}
+.face-frame.lg{width:88px;height:92px}
+.face-frame.lg .ff-eyes{font-size:18px;letter-spacing:.32em}
+.face-frame.lg .ff-mouth{font-size:16px}
+
+/* compat aliases */
+.sup-face-box,.unit-face{
+  position:relative;
+  width:72px;height:76px;
+  border:1px solid var(--border,#2a4a32);
+  background:linear-gradient(180deg,#0a140e 0%,#050a08 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  box-shadow:inset 0 0 18px #000a, 0 0 12px color-mix(in srgb, var(--green,#7dff9a) 18%, transparent);
+  flex-shrink:0;
+}
+.sup-face-box:before,.unit-face:before,
+.sup-face-box:after,.unit-face:after{
+  content:"";position:absolute;width:8px;height:8px;border-color:var(--green,#7dff9a);border-style:solid;opacity:.7;
+}
+.sup-face-box:before,.unit-face:before{top:3px;left:3px;border-width:1px 0 0 1px}
+.sup-face-box:after,.unit-face:after{bottom:3px;right:3px;border-width:0 1px 1px 0}
+.sup-eyes,.unit-face .uf-eyes,.ff-eyes{font-size:15px;letter-spacing:.28em;color:var(--green,#7dff9a);line-height:1}
+.sup-mouth,.unit-face .uf-mouth,.ff-mouth{font-size:14px;color:var(--green,#7dff9a);line-height:1;min-height:1em}
+.sup-face-box.talk .sup-mouth,
+.unit-face.talk .uf-mouth,
+.face-frame.talk .ff-mouth{animation:mouthTalk .28s steps(2) infinite}
+.sup-face-mini{
+  position:relative;width:44px;height:48px;
+  border:1px solid var(--border);background:linear-gradient(180deg,#0a140e,#050a08);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  box-shadow:inset 0 0 10px #000a;flex-shrink:0;
+}
+.sup-face-mini:before{content:"";position:absolute;top:2px;left:2px;width:6px;height:6px;border-width:1px 0 0 1px;border-style:solid;border-color:var(--green);opacity:.6}
+.sup-face-mini .sup-eyes-mini, .sup-face-mini #supEyesMini{font-size:11px;letter-spacing:.15em;color:var(--green);line-height:1}
+.sup-face-mini .sup-mouth-mini, .sup-face-mini #supMouthMini{font-size:10px;color:var(--green);line-height:1}
+.sup-face-mini.talk #supMouthMini{animation:mouthTalk .28s steps(2) infinite}
+.unit-item{display:flex;gap:14px;align-items:center}
+.unit-item .unit-body{flex:1;min-width:0}
+.sup-avatar-row{display:flex;gap:16px;align-items:center;margin-bottom:12px;padding:10px;border:1px solid var(--border);background:var(--panel,#0a100d)}
+.sup-comm-head{display:flex;align-items:center;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+
+
+.dept-grid{display:grid;grid-template-columns:1fr;gap:10px;margin:14px 0}
+.dept-card{border:1px solid var(--border);background:var(--panel,#0a100d);padding:14px 16px;text-align:left;cursor:pointer;transition:border-color .2s}
+.dept-card:hover{border-color:var(--green)}
+.dept-card .dc-title{font-size:13px;letter-spacing:.16em;color:var(--green);margin-bottom:6px}
+.dept-card .dc-sub{font-size:11px;color:var(--muted,#6a8a72);line-height:1.5}
+.dept-card.locked{opacity:.45;cursor:default}
+.dept-card.locked:hover{border-color:var(--border)}
+.cont-screen{display:none;flex-direction:column;gap:10px;width:100%;max-width:760px;margin:0 auto}
+.cont-screen.active{display:flex}
+.cont-hud{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cont-bar-wrap{border:1px solid var(--border);padding:10px;background:var(--panel)}
+.cont-bar-wrap .label{font-size:10px;letter-spacing:.12em;color:var(--muted);margin-bottom:4px}
+.cont-bar{height:10px;background:#07100a;border:1px solid var(--border);overflow:hidden}
+.cont-bar > i{display:block;height:100%;background:var(--green);width:50%;transition:width .25s}
+.cont-bar.enemy > i{background:#ff6a6a}
+.cont-face-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:8px 0}
+.cont-log{border:1px solid var(--border);background:#050806;padding:10px;max-height:140px;overflow-y:auto;font-size:12px;line-height:1.45}
+.cont-log .you{color:var(--green)}
+.cont-log .enemy{color:#ff9090}
+.cont-log .sys{color:var(--muted);font-size:11px}
+.cont-hand{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;min-height:110px}
+.cont-card{width:108px;border:1px solid var(--border);background:#07100a;padding:8px;cursor:pointer;text-align:left;font-size:10px;line-height:1.3}
+.cont-card:hover{border-color:var(--green)}
+.cont-card .cn{color:var(--green);letter-spacing:.06em;font-size:11px;margin-bottom:4px}
+.cont-card .cm{color:var(--muted);font-size:9px}
+.cont-card .cst{margin-top:6px;color:var(--text)}
+.cont-card.r-rare{border-color:#6a8ac0}
+.cont-card.r-epic{border-color:#b08a40}
+.cont-card.r-uncommon{border-color:#4a8a6a}
+.cont-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.cont-select{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.cont-energy{font-size:12px;letter-spacing:.1em;color:var(--green);text-align:center}
+.pack-item{border:1px solid var(--border);padding:12px;margin-bottom:8px;background:#07100a}
+
 </style>
 </head>
 <body>
@@ -389,12 +500,89 @@ body{background:var(--bg)!important;color:var(--text)}
   <div class="ag-sub">El navegador bloquea el sonido hasta un toque. Después la música arranca sola.</div>
 </div>
 
-<div class="version-badge" id="versionBadge">v8.7</div>
+<div class="version-badge" id="versionBadge">v9.0</div>
 <div class="noise" id="noise"></div>
 <div class="scanline-extra" id="scanExtra"></div>
 <div class="vignette-pulse" id="vignette"></div>
 <div class="flash" id="flash"></div>
 <div class="sysmsg" id="sysmsg"></div>
+
+
+<div class="modal-bg" id="deptModal" role="dialog">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head"><h3>◈ DEPARTAMENTOS U.E.C.</h3></div>
+    <div class="modal-body">
+      <p class="hint" style="margin-bottom:10px">Elige sector. Cada departamento tiene su propio protocolo de entrada.</p>
+      <div class="dept-grid">
+        <div class="dept-card" id="deptInvest">
+          <div class="dc-title">INVESTIGACIÓN</div>
+          <div class="dc-sub">Entrevistas de presencia. Unidad activa. El test original: 20 preguntas, memoria y finales.</div>
+        </div>
+        <div class="dept-card" id="deptCont">
+          <div class="dc-title">CONTINGENCIA</div>
+          <div class="dc-sub">Combate 1 vs 1 contra cada Unidad. Cartas de tropa, integridad y sobres en la tienda.</div>
+        </div>
+        <div class="dept-card locked" id="deptSup">
+          <div class="dc-title">SUPERVISOR</div>
+          <div class="dc-sub">Terminal de vigilancia. Requiere las cinco unidades desbloqueadas.</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot"><div class="close-row"><button type="button" class="button" id="deptClose">CERRAR</button></div></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="deptIntroModal" role="dialog">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head"><h3 id="deptIntroTitle">◈ SECTOR</h3></div>
+    <div class="modal-body"><div id="deptIntroBody" class="ending-lore" style="max-height:40vh"></div></div>
+    <div class="modal-foot"><div class="close-row">
+      <button type="button" class="button" id="deptIntroGo">ENTRAR</button>
+      <button type="button" class="button" id="deptIntroBack">VOLVER</button>
+    </div></div>
+  </div>
+</div>
+
+<div class="cont-screen" id="contScreen">
+  <div id="contLobby">
+    <h2 style="letter-spacing:.14em;color:var(--green);font-size:16px">CONTINGENCIA</h2>
+    <p class="sub">Elige unidad a contener. Vacía su integridad con cartas de tropa.</p>
+    <div class="cont-select" id="contUnitSelect"></div>
+    <p class="cont-energy" id="contDeckInfo">Mazo: —</p>
+    <div class="controls">
+      <button class="button" id="contStartBtn">INICIAR CONTENCIÓN</button>
+      <button class="button" id="contBackBtn">VOLVER</button>
+    </div>
+  </div>
+  <div id="contBattle" style="display:none">
+    <div class="cont-face-row">
+      <div class="face-frame sm" id="contPlayerFace"><div class="ff-scan"></div><div class="ff-eyes">• •</div><div class="ff-mouth">─</div></div>
+      <div style="text-align:center;flex:1">
+        <div class="cont-energy" id="contEnergy">ENERGÍA 3/3</div>
+        <div class="tiny" id="contTurn">TURNO 1</div>
+      </div>
+      <div class="face-frame sm" id="contEnemyFace"><div class="ff-scan"></div><div class="ff-eyes">• •</div><div class="ff-mouth">﹀</div></div>
+    </div>
+    <div class="cont-hud">
+      <div class="cont-bar-wrap"><div class="label">TU INTEGRIDAD</div><div class="cont-bar" id="contPBar"><i id="contPFill"></i></div><div class="tiny" id="contPHP">30/30</div></div>
+      <div class="cont-bar-wrap"><div class="label" id="contEName">UNIDAD</div><div class="cont-bar enemy" id="contEBar"><i id="contEFill"></i></div><div class="tiny" id="contEHP">—</div></div>
+    </div>
+    <div class="cont-log" id="contLog"></div>
+    <div class="cont-hand" id="contHand"></div>
+    <div class="cont-actions">
+      <button class="button" id="contEndTurn">FIN DE TURNO</button>
+      <button class="button" id="contFlee" style="border-color:#6a3030;color:#ff9090">ABORTAR</button>
+    </div>
+  </div>
+  <div id="contResult" style="display:none;text-align:center">
+    <h2 id="contResultTitle">—</h2>
+    <p class="sub" id="contResultText"></p>
+    <div class="controls">
+      <button class="button" id="contAgain">OTRA UNIDAD</button>
+      <button class="button" id="contExit">SALIR</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-bg" id="settingsModal" role="dialog" aria-modal="true" aria-label="Ajustes">
   <div class="modal">
@@ -456,7 +644,7 @@ body{background:var(--bg)!important;color:var(--text)}
       <div class="close-row">
         <button type="button" class="button" id="settingsClose">CERRAR</button>
       </div>
-      <p class="version-in" id="settingsVersion">v8.7</p>
+      <p class="version-in" id="settingsVersion">v9.0</p>
     </div>
   </div>
 </div>
@@ -519,13 +707,6 @@ body{background:var(--bg)!important;color:var(--text)}
           <button type="button" class="button" id="openShopBtn">TIENDA</button>
         </div>
         <p class="hint">Gasta CE en documentos raros y en otras unidades de entrevista.</p>
-      </section>
-      <section>
-        <h4>OPERADORES</h4>
-        <div class="row">
-          <button type="button" class="button" id="openUnitsBtn">UNIDADES</button>
-        </div>
-        <p class="hint">Cada unidad cambia tono, color, cara, preguntas y finales.</p>
       </section>
       <section>
         <h4>PRUEBAS</h4>
@@ -641,12 +822,12 @@ body{background:var(--bg)!important;color:var(--text)}
         <span style="color:#4a6a52;font-size:11px">Sesión local. Sin servidor central. Cada evaluación elige 20 preguntas de un banco amplio. Si vuelves, es posible que recuerde ecos de lo que dijiste.</span>
       </p>
       <div class="controls">
-        <button class="button" id="startBtn">INICIAR EVALUACIÓN →</button>
+        <button class="button" id="deptBtn">DEPARTAMENTOS →</button>
         <button class="button" id="introEndingsBtn">FINALES <span id="endingCountIntro">(0)</span></button>
         <button class="button" id="introUnitsBtn">UNIDADES</button>
         <button class="button" id="introExtraBtn">EXTRA</button>
         <button class="button" id="settingsOpen2">⚙ AJUSTES</button>
-        <button class="button" id="supervisorBtn">MODO SUPERVISOR</button>
+        <button class="button" id="supervisorBtn" style="display:none">MODO SUPERVISOR</button>
       </div>
       <p class="tiny" id="introMeta">
         DURACIÓN EST. 14–20 MIN · 20 PREGUNTAS · DOCUMENTOS OCULTOS<br>
@@ -659,9 +840,10 @@ body{background:var(--bg)!important;color:var(--text)}
       <!-- Briefing con cara del Supervisor -->
       <div id="supBriefPhase">
         <div class="sup-avatar-row">
-          <div class="sup-face-box" id="supFaceBrief">
-            <div class="sup-eyes" id="supEyesBrief">◈ ◈</div>
-            <div class="sup-mouth" id="supMouthBrief">─</div>
+          <div class="sup-face-box face-frame" id="supFaceBrief">
+            <div class="ff-scan"></div>
+            <div class="sup-eyes ff-eyes" id="supEyesBrief">◈ ◈</div>
+            <div class="sup-mouth ff-mouth" id="supMouthBrief">─</div>
           </div>
           <div>
             <h2 class="sup-title">SUPERVISOR</h2>
@@ -697,9 +879,10 @@ body{background:var(--bg)!important;color:var(--text)}
 
         <div class="sup-comm" id="supComm">
           <div class="sup-comm-head">
-            <div class="sup-face-mini" id="supFaceMini">
-              <span id="supEyesMini">◈ ◈</span>
-              <span id="supMouthMini">─</span>
+            <div class="sup-face-mini face-frame sm" id="supFaceMini">
+              <div class="ff-scan"></div>
+              <span class="ff-eyes" id="supEyesMini">◈ ◈</span>
+              <span class="ff-mouth" id="supMouthMini">─</span>
             </div>
             <div class="sup-comm-title">SUPERVISOR · CANAL ABIERTO</div>
           </div>
@@ -713,9 +896,10 @@ body{background:var(--bg)!important;color:var(--text)}
 
       <!-- Fin -->
       <div id="supEndPhase" style="display:none;text-align:center">
-        <div class="sup-face-box" style="margin:0 auto 12px" id="supFaceEnd">
-          <div class="sup-eyes" id="supEyesEnd">◈ ◈</div>
-          <div class="sup-mouth" id="supMouthEnd">─</div>
+        <div class="sup-face-box face-frame lg" style="margin:0 auto 12px" id="supFaceEnd">
+          <div class="ff-scan"></div>
+          <div class="sup-eyes ff-eyes" id="supEyesEnd">◈ ◈</div>
+          <div class="sup-mouth ff-mouth" id="supMouthEnd">─</div>
         </div>
         <h2 id="supEndTitle">—</h2>
         <p id="supEndText" class="sub"></p>
@@ -778,11 +962,13 @@ body{background:var(--bg)!important;color:var(--text)}
   </footer>
 </main>
 
-<script src="js/units.js?v=8.7"></script>
-<script src="js/supervisor.js?v=8.7"></script>
-<script src="js/minigames.js?v=8.7"></script>
-<script src="js/documents.js?v=8.7"></script>
-<script src="js/questions.js?v=8.7"></script>
-<script src="js/app.js?v=8.7"></script>
+<script src="js/cards.js?v=9.0"></script>
+<script src="js/contingency.js?v=9.0"></script>
+<script src="js/units.js?v=9.0"></script>
+<script src="js/supervisor.js?v=9.0"></script>
+<script src="js/minigames.js?v=9.0"></script>
+<script src="js/documents.js?v=9.0"></script>
+<script src="js/questions.js?v=9.0"></script>
+<script src="js/app.js?v=9.0"></script>
 </body>
 </html>

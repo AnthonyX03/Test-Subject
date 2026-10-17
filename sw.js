@@ -1,5 +1,5 @@
-/* TEST SUBJECT — Service Worker v8.7 */
-const CACHE = 'ts-09-v8.7';
+/* TEST SUBJECT — Service Worker v9.0 */
+const CACHE = 'ts-09-v9.0';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,8 @@ const ASSETS = [
   './js/documents.js',
   './js/questions.js',
   './js/supervisor.js',
+  './js/cards.js',
+  './js/contingency.js',
   './audio/SUPERVISOR.mp3',
   './audio/SUPERVISORHORROR.mp3',
   './js/app.js',
