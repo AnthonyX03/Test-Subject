@@ -279,6 +279,99 @@ body{background:var(--bg)!important;color:var(--text)}
 #supervisorBtn{display:none!important;border-color:#8a3030!important;color:#ff9090!important}
 #supervisorBtn.show{display:inline-block!important}
 
+
+.sup-screen{display:none;flex-direction:column;gap:10px;width:100%;max-width:760px;margin:0 auto;padding-bottom:12px}
+.sup-screen.active{display:flex}
+.sup-screen.horror .sup-map-wrap{box-shadow:0 0 24px #4a101066;border-color:#6a3030}
+.sup-screen.horror .sup-comm{border-color:#6a3030}
+.sup-title{letter-spacing:.16em;color:var(--green,#7dff9a);margin:0;font-size:18px}
+.sup-avatar-row{display:flex;gap:14px;align-items:center;margin-bottom:10px}
+.sup-face-box{width:64px;height:64px;border:1px solid var(--border,#2a4a32);background:var(--panel,#0a100d);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.sup-eyes{font-size:14px;letter-spacing:.2em;color:var(--green)}
+.sup-mouth{font-size:14px;color:var(--green)}
+.sup-face-mini{display:flex;flex-direction:column;align-items:center;font-size:10px;line-height:1.1;color:var(--green);min-width:28px}
+.sup-hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px;letter-spacing:.08em}
+.sup-hud strong{display:block;font-size:15px;color:var(--green)}
+.sup-map-wrap{position:relative;width:100%;aspect-ratio:1.15/1;border:1px solid var(--border);background:radial-gradient(ellipse at center,#0a120e 0%,#030605 70%);overflow:hidden}
+.sup-edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.45}
+.sup-edges line{stroke:var(--border);stroke-width:.4}
+.sup-nodes{position:absolute;inset:0;pointer-events:none}
+.sup-node{position:absolute;transform:translate(-50%,-50%);border:1px solid var(--border);background:#07100acc;padding:4px 6px;font-size:9px;letter-spacing:.08em;color:var(--muted,#6a8a72);white-space:nowrap;pointer-events:auto;cursor:pointer}
+.sup-node.you{border-color:var(--green);color:var(--green);box-shadow:0 0 8px color-mix(in srgb,var(--green) 35%,transparent)}
+.sup-node.active-cam{border-color:var(--green);color:var(--green)}
+.sup-units{position:absolute;inset:0;pointer-events:none}
+.sup-unit{position:absolute;transform:translate(-50%,-50%);width:36px;height:36px;border:1px solid;background:#050806ee;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;line-height:1.05;transition:left .35s linear,top .35s linear;z-index:3;box-shadow:0 0 10px currentColor}
+.sup-unit .u-eyes{letter-spacing:.12em}
+.sup-unit .u-name{font-size:8px;opacity:.85}
+.sup-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center}
+.sup-door-pill{font-size:11px;letter-spacing:.1em;color:var(--muted)}
+.sup-comm{border:1px solid var(--border);background:var(--panel);padding:10px;display:flex;flex-direction:column;gap:8px;max-height:220px}
+.sup-comm-head{display:flex;align-items:center;gap:10px}
+.sup-comm-title{font-size:11px;letter-spacing:.12em;color:var(--green)}
+.sup-chat-log{flex:1;overflow-y:auto;max-height:140px;font-size:12px;line-height:1.45;color:var(--text);display:flex;flex-direction:column;gap:6px;scrollbar-width:thin}
+.sup-chat-line{opacity:.95}
+.sup-chat-line.sys{color:var(--muted);font-size:11px}
+.sup-chat-line.sup{color:var(--green)}
+.sup-chat-line.you{color:var(--text);opacity:.8}
+.sup-chat-line.glitch{color:#ff9090;letter-spacing:.04em}
+.sup-chat-input{display:flex;gap:8px}
+.sup-chat-input input{flex:1;background:#050806;border:1px solid var(--border);color:var(--text);padding:8px 10px;font-size:13px}
+@media(max-width:520px){
+  .sup-unit{width:30px;height:30px;font-size:8px}
+  .sup-node{font-size:8px;padding:3px 4px}
+  .sup-comm{max-height:180px}
+}
+
+
+/* Ending detail above endings list */
+#endingDetailModal{z-index:55}
+#endingDetailModal .modal{max-height:80dvh}
+.ending-lore{white-space:pre-wrap;line-height:1.6;font-size:13px;color:var(--text,#b0d4b8);max-height:50vh;overflow-y:auto}
+
+/* Shop tabs */
+.shop-tabs{display:flex;gap:8px;margin-bottom:12px}
+.shop-tabs .tab{flex:1;border:1px solid var(--border,#2a4a32);background:#07100a;color:var(--muted,#6a8a72);padding:10px;font-size:11px;letter-spacing:.12em;cursor:pointer}
+.shop-tabs .tab.active{border-color:var(--green);color:var(--green)}
+
+/* Unit face in list */
+.unit-item{display:flex;gap:12px;align-items:flex-start}
+.unit-face{width:48px;height:48px;border:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;line-height:1.15;background:#050806}
+.unit-face .uf-eyes{letter-spacing:.15em}
+.unit-item .unit-body{flex:1;min-width:0}
+
+/* Minigames polish */
+.mg-overlay{z-index:80}
+.mg-box{background:#0a100d;border:1px solid #2a4a32;max-width:560px;width:100%;max-height:92dvh;overflow:auto;padding:22px 20px 16px;color:#b0d4b8;box-shadow:0 0 40px #001a0a88;position:relative}
+.mg-abort{position:absolute;top:10px;right:10px;font-size:10px;letter-spacing:.1em;border:1px solid #4a3030;color:#ff9090;background:transparent;padding:6px 10px;cursor:pointer}
+.mg-title{font-size:13px;letter-spacing:.18em;color:var(--green,#7dff9a);margin-bottom:6px}
+.mg-sub{font-size:12px;color:#6a8a72;margin-bottom:16px;line-height:1.4}
+.mg-hack-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.mg-word,.mg-seq-btn{border:1px solid #2a4a32;background:#07100a;color:#9ed4aa;padding:12px 8px;font-size:13px;letter-spacing:.1em;cursor:pointer;min-height:44px}
+.mg-word:hover,.mg-seq-btn:hover{border-color:#4d8b60;background:#0c1810}
+.mg-word:disabled{opacity:.35}
+.mg-log{font-size:12px;color:#8ab89a;min-height:1.5em;margin-top:12px;letter-spacing:.06em}
+.mg-board{display:flex;flex-direction:column;gap:8px;margin:14px 0;align-items:center}
+.mg-row{display:flex;gap:8px;justify-content:center}
+.mg-cell{width:42px;height:42px;border:1px solid #2a4a32;display:grid;place-items:center;font-size:16px;font-weight:600}
+.mg-cell.ok{background:#1a4a28;border-color:#4d8b60;color:#b0ffc0}
+.mg-cell.mid{background:#4a4010;border-color:#8a7a30;color:#ffe08a}
+.mg-cell.bad{background:#1a1010;border-color:#4a2020;color:#886}
+.mg-input{width:100%;background:#07100a;border:1px solid #2a4a32;color:#c0e8c8;padding:12px;font-size:15px;letter-spacing:.25em;text-transform:uppercase;text-align:center}
+.mg-seq-display{font-size:32px;text-align:center;padding:20px;letter-spacing:.35em;color:var(--green,#7dff9a);min-height:1.4em}
+.mg-seq-pad{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:8px}
+.mg-seq-btn{width:48px;height:48px;font-size:18px;padding:0}
+.mg-seq-btn.flash{border-color:var(--green);background:#1a3a24;box-shadow:0 0 12px #4d8b6066}
+.mg-decrypt-out{font-size:18px;letter-spacing:.25em;text-align:center;margin:16px 0;color:#c0e8c8}
+.mg-decrypt-pool{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.mg-signal-track{position:relative;height:32px;background:#07100a;border:1px solid #2a4a32;margin:18px 0;overflow:hidden}
+.mg-signal-zone{position:absolute;top:0;bottom:0;background:#1a4a2844;border-left:1px solid #4d8b60;border-right:1px solid #4d8b60}
+.mg-signal-marker{position:absolute;top:0;bottom:0;width:5px;background:var(--green,#7dff9a);transform:translateX(-50%)}
+
+/* Soft audio gate — less blocking look */
+.audio-gate{position:fixed;inset:0;z-index:90;background:#050806f0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;transition:opacity .35s}
+.audio-gate.hide{opacity:0;pointer-events:none}
+.audio-gate.soft{background:#050806aa}
+
 </style>
 </head>
 <body>
@@ -288,7 +381,7 @@ body{background:var(--bg)!important;color:var(--text)}
   <div class="ag-sub">El navegador bloquea el sonido hasta un toque. Después la música arranca sola.</div>
 </div>
 
-<div class="version-badge" id="versionBadge">v8.1</div>
+<div class="version-badge" id="versionBadge">v8.3</div>
 <div class="noise" id="noise"></div>
 <div class="scanline-extra" id="scanExtra"></div>
 <div class="vignette-pulse" id="vignette"></div>
@@ -355,7 +448,7 @@ body{background:var(--bg)!important;color:var(--text)}
       <div class="close-row">
         <button type="button" class="button" id="settingsClose">CERRAR</button>
       </div>
-      <p class="version-in" id="settingsVersion">v8.1</p>
+      <p class="version-in" id="settingsVersion">v8.3</p>
     </div>
   </div>
 </div>
@@ -553,35 +646,69 @@ body{background:var(--bg)!important;color:var(--text)}
     </div>
 
     
-    <div class="sup-screen" id="supScreen">
+        <div class="sup-screen" id="supScreen">
+      <!-- Briefing con cara del Supervisor -->
       <div id="supBriefPhase">
-        <h2 style="letter-spacing:.14em;color:var(--green)">MODO SUPERVISOR</h2>
-        <p class="tiny">U.E.C. — Terminal de vigilancia · Acceso restringido</p>
-        <div class="sup-brief" id="supBriefText"></div>
-        <div class="controls" style="margin-top:16px">
+        <div class="sup-avatar-row">
+          <div class="sup-face-box" id="supFaceBrief">
+            <div class="sup-eyes" id="supEyesBrief">◈ ◈</div>
+            <div class="sup-mouth" id="supMouthBrief">─</div>
+          </div>
+          <div>
+            <h2 class="sup-title">SUPERVISOR</h2>
+            <p class="tiny">TERMINAL DE VIGILANCIA · U.E.C.</p>
+          </div>
+        </div>
+        <div class="sup-chat-log" id="supBriefLog"></div>
+        <div class="controls" style="margin-top:14px">
           <button class="button" id="supStartNight">INICIAR SESIÓN</button>
           <button class="button" id="supAbortBrief">ABORTAR</button>
         </div>
       </div>
+
+      <!-- Juego -->
       <div id="supPlayPhase" style="display:none">
         <div class="sup-hud">
           <div><small>SESIÓN</small><strong id="supSession">1/5</strong></div>
           <div><small>TIEMPO</small><strong id="supTime">6:00</strong></div>
           <div><small>ENERGÍA</small><strong id="supPower">100%</strong></div>
         </div>
-        <div class="sup-office" id="supOffice">
-          <div>OFICINA · TERMINAL DE SUPERVISIÓN</div>
-          <div class="door-state" id="supDoorLabel">PUERTA: ABIERTA</div>
+
+        <div class="sup-map-wrap" id="supMapWrap">
+          <svg class="sup-edges" id="supEdges" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+          <div class="sup-nodes" id="supNodes"></div>
+          <div class="sup-units" id="supUnitsLayer"></div>
         </div>
-        <div class="sup-view" id="supCamView">Cámara inactiva. Abre el panel.</div>
-        <div class="sup-cams" id="supCams"></div>
+
         <div class="sup-actions">
           <button class="button" id="supDoorBtn">CERRAR PUERTA</button>
-          <button class="button" id="supCamToggle">CÁMARAS</button>
+          <button class="button" id="supCamToggle">CÁMARAS: OFF</button>
+          <span class="sup-door-pill" id="supDoorLabel">PUERTA ABIERTA</span>
           <button class="button" id="supAbortPlay" style="border-color:#6a3030;color:#ff9090">ABORTAR</button>
         </div>
+
+        <div class="sup-comm" id="supComm">
+          <div class="sup-comm-head">
+            <div class="sup-face-mini" id="supFaceMini">
+              <span id="supEyesMini">◈ ◈</span>
+              <span id="supMouthMini">─</span>
+            </div>
+            <div class="sup-comm-title">SUPERVISOR · CANAL ABIERTO</div>
+          </div>
+          <div class="sup-chat-log" id="supPlayLog"></div>
+          <div class="sup-chat-input">
+            <input type="text" id="supChatInput" placeholder="Escribe al Supervisor…" maxlength="120" autocomplete="off">
+            <button class="button" id="supChatSend">ENVIAR</button>
+          </div>
+        </div>
       </div>
+
+      <!-- Fin -->
       <div id="supEndPhase" style="display:none;text-align:center">
+        <div class="sup-face-box" style="margin:0 auto 12px" id="supFaceEnd">
+          <div class="sup-eyes" id="supEyesEnd">◈ ◈</div>
+          <div class="sup-mouth" id="supMouthEnd">─</div>
+        </div>
         <h2 id="supEndTitle">—</h2>
         <p id="supEndText" class="sub"></p>
         <div class="controls">
@@ -590,7 +717,8 @@ body{background:var(--bg)!important;color:var(--text)}
         </div>
       </div>
     </div>
-    <div class="game" id="game">
+
+<div class="game" id="game">
       <div class="hud">
         <div class="metric"><small>ESTADO DEL SISTEMA</small><strong id="sysValue">NORMAL</strong><div class="bar"><span id="sysBar"></span></div></div>
         <div class="metric"><small>FASE DE EVALUACIÓN</small><strong id="phaseValue">01 / 20</strong><div class="bar"><span id="phaseBar"></span></div></div>
@@ -642,11 +770,11 @@ body{background:var(--bg)!important;color:var(--text)}
   </footer>
 </main>
 
-<script src="js/units.js?v=8.1"></script>
-<script src="js/supervisor.js?v=8.1"></script>
-<script src="js/minigames.js?v=8.1"></script>
-<script src="js/documents.js?v=8.1"></script>
-<script src="js/questions.js?v=8.1"></script>
-<script src="js/app.js?v=8.1"></script>
+<script src="js/units.js?v=8.3"></script>
+<script src="js/supervisor.js?v=8.3"></script>
+<script src="js/minigames.js?v=8.3"></script>
+<script src="js/documents.js?v=8.3"></script>
+<script src="js/questions.js?v=8.3"></script>
+<script src="js/app.js?v=8.3"></script>
 </body>
 </html>
