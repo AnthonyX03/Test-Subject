@@ -1,7 +1,7 @@
 /* TEST SUBJECT — Minijuegos de seguridad / prueba */
 (function (g) {
-  const WORDS5 = ['HORSE','REGAL','PLANT','GHOST','TRACE','SIGNAL','FRAME','PROBE','VAULT','NULLX','DELTA','ECHOO','SHIFT','BLEND','CRYPT'];
-  const WORDS_HACK = ['BRAIN','BLAST','WHARF','HATCH','SLOTS','SPARK','CRANK','CRANE','FLOOD','CLOUD','TRACE','AGENT','NODE','VAULT','GHOST','PROBE','SIGNAL','FRAME'];
+  const WORDS5 = ['HORSE','REGAL','PLANT','GHOST','TRACE','FRAME','PROBE','VAULT','DELTA','SHIFT','BLEND','CRANE','BRAIN','CLOUD','HATCH','FLOOD','AGENT','SPARK','NODE','PANEL'];
+  const WORDS_HACK = ['BRAIN','BLAST','WHARF','HATCH','SLOTS','SPARK','CRANK','CRANE','FLOOD','CLOUD','TRACE','AGENT','VAULT','GHOST','PROBE','FRAME','PLANT','DELTA','HORSE','PANEL'];
 
   function rand(a) { return a[Math.floor(Math.random() * a.length)]; }
   function shuffle(arr) {
@@ -53,7 +53,7 @@
 
   /** 2 OVERRIDE — wordle-like */
   function createOverride(root, onDone) {
-    const secret = rand(WORDS5).slice(0, 5).toUpperCase();
+    const secret = rand(WORDS5.filter(w => w.length === 5)).toUpperCase();
     let row = 0;
     const max = 5;
     root.innerHTML = '';
@@ -81,18 +81,37 @@
     const msg = el('div', 'mg-log', '');
     root.append(board, input, msg);
     setTimeout(() => input.focus(), 100);
+    function scoreGuess(guess, answer) {
+      // Evaluación tipo Wordle: verdes primero, luego amarillos con cupo
+      const res = Array(5).fill('bad');
+      const left = {};
+      for (let i = 0; i < 5; i++) {
+        if (guess[i] === answer[i]) res[i] = 'ok';
+        else left[answer[i]] = (left[answer[i]] || 0) + 1;
+      }
+      for (let i = 0; i < 5; i++) {
+        if (res[i] === 'ok') continue;
+        if (left[guess[i]] > 0) {
+          res[i] = 'mid';
+          left[guess[i]]--;
+        }
+      }
+      return res;
+    }
     function submit() {
+      if (row >= max) return;
       const guess = (input.value || '').toUpperCase().replace(/[^A-Z]/g, '');
-      if (guess.length !== 5) { msg.textContent = '5 letras.'; return; }
+      if (guess.length !== 5) { msg.textContent = 'Necesitas exactamente 5 letras.'; return; }
       const cells = rows[row];
+      const marks = scoreGuess(guess, secret);
       for (let i = 0; i < 5; i++) {
         cells[i].textContent = guess[i];
-        if (guess[i] === secret[i]) cells[i].classList.add('ok');
-        else if (secret.includes(guess[i])) cells[i].classList.add('mid');
-        else cells[i].classList.add('bad');
+        cells[i].classList.remove('ok', 'mid', 'bad');
+        cells[i].classList.add(marks[i]);
       }
       if (guess === secret) {
         msg.textContent = 'CLAVE ACEPTADA';
+        input.disabled = true;
         setTimeout(() => onDone(true, 15), 500);
         return;
       }
@@ -100,10 +119,13 @@
       input.value = '';
       if (row >= max) {
         msg.textContent = 'FALLO. Era: ' + secret;
+        input.disabled = true;
         setTimeout(() => onDone(false, 0), 900);
+      } else {
+        msg.textContent = 'Intentos: ' + (max - row);
       }
     }
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
   }
 
   /** 3 SEQUENCE — memorizar secuencia */

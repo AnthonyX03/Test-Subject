@@ -5,7 +5,7 @@
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v7';
-const APP_VERSION = '8.3';
+const APP_VERSION = '8.6';
 
 function getUnitEndings() {
   const u = getActiveUnit();
@@ -232,13 +232,13 @@ async function playTrack(which) {
       return;
     }
     if (which === 'horror' && prev !== next) {
-      await fadeVolume(prev, 0, 350);
+      // Corte casi inmediato: visual y audio alineados
       try { prev.pause(); prev.currentTime = 0; } catch (e) {}
-      await new Promise(r => setTimeout(r, 400));
-      next.volume = targetVol;
+      next.volume = 0;
       music.current = next;
       const p = next.play();
       if (p && p.catch) p.catch(() => {});
+      fadeVolume(next, targetVol, 280);
       return;
     }
     if (prev && prev !== next && !prev.paused) {
@@ -516,14 +516,18 @@ function getEndingLore(def) {
   );
 }
 function openEndingDetail(def) {
+  if (!def) return;
   const m = $('endingDetailModal');
   const t = $('endingDetailTitle');
   const b = $('endingDetailBody');
   if (t) t.textContent = '◈ ' + (def.title || 'FINAL');
-  if (b) b.textContent = getEndingLore(def);
+  if (b) {
+    b.textContent = getEndingLore(def);
+    b.scrollTop = 0;
+  }
   if (m) {
     m.classList.add('open');
-    m.style.zIndex = '55';
+    m.style.zIndex = '60';
   }
 }
 function closeEndingDetail() {
@@ -693,12 +697,33 @@ function updateHUD() {
   }
 }
 
-function maybeSwitchHorrorMusic() {
-  if (!audioOn || horrorMusicStarted) return;
-  // Mal rollo más tarde: ~preguntas 13–15 o tensión alta sostenida
-  if (idx >= sessionHorrorAt || unsettling >= 10) {
-    horrorMusicStarted = true;
+/** Un solo punto de entrada: música + visual mal rollo a la vez (todas las unidades) */
+function enterSessionHorror(reason) {
+  if (horrorMusicStarted) return;
+  horrorMusicStarted = true;
+  // Música (mismo instante que el visual)
+  if (audioOn) {
+    music.unlocked = true;
     playTrack('horror');
+  }
+  // Visual (misma unidad de tiempo)
+  document.body.classList.add('corrupt');
+  document.body.classList.add('redmode');
+  document.body.classList.remove('voidmode');
+  document.documentElement.style.setProperty('--scan-op', '0.48');
+  const scan = $('scanExtra');
+  if (scan) scan.style.opacity = '0.5';
+  const noise = $('noise');
+  if (noise) noise.style.opacity = '0.32';
+  updateHUD();
+  showSysMsg(reason || 'SEÑAL INESTABLE', 2200, true);
+  sound('glitch');
+}
+function maybeSwitchHorrorMusic() {
+  // Dispara mal rollo visual + audio juntos
+  if (horrorMusicStarted) return;
+  if (idx >= sessionHorrorAt || unsettling >= 10) {
+    enterSessionHorror(idx >= sessionHorrorAt ? 'FASE DE CONTINUIDAD' : 'TENSIÓN CRÍTICA');
   }
 }
 
@@ -995,6 +1020,7 @@ function begin() {
   ensureCtx();
   sessionHorrorAt = 13 + Math.floor(Math.random() * 3);
   horrorMusicStarted = false;
+  document.body.classList.remove('corrupt', 'redmode', 'voidmode', 'glitch');
   applyUnitTheme();
 refreshSupervisorBtn();
 
@@ -1068,20 +1094,30 @@ async function showQuestion() {
   }
 
   const noise = $('noise'), scan = $('scanExtra');
-  if (idx >= 4 && noise) noise.style.opacity = String(Math.min(0.38, (idx - 3) * 0.03));
-  if (idx >= 8) { document.body.classList.add('corrupt'); if (scan) scan.style.opacity = '0.45'; }
-  if (idx >= 12) {
+  // Antes del mal rollo: solo ruido leve (sin rojo / void)
+  if (!horrorMusicStarted) {
+    if (idx >= 4 && noise) noise.style.opacity = String(Math.min(0.22, (idx - 3) * 0.02));
+    if (idx >= 8 && scan) scan.style.opacity = '0.25';
+    // glitch muy ocasional y corto, sin cambiar paleta
+    if (idx >= 6 && Math.random() < 0.2) {
+      document.body.classList.add('glitch');
+      setTimeout(() => document.body.classList.remove('glitch'), 400);
+    }
+  } else {
+    // Ya en mal rollo: efectos intensos sincronizados con la música
+    if (noise) noise.style.opacity = String(Math.min(0.42, 0.28 + (idx - sessionHorrorAt) * 0.03));
+    if (scan) scan.style.opacity = '0.5';
+    document.body.classList.add('corrupt');
     document.body.classList.add('redmode');
-    document.documentElement.style.setProperty('--scan-op', '0.48');
-  }
-  if (idx >= 16) {
-    document.body.classList.remove('redmode');
-    document.body.classList.add('voidmode');
-    document.documentElement.style.setProperty('--scan-op', '0.55');
-  }
-  if (idx >= 5 && Math.random() < 0.45) {
-    document.body.classList.add('glitch');
-    setTimeout(() => document.body.classList.remove('glitch'), 550);
+    if (idx >= sessionHorrorAt + 3) {
+      document.body.classList.remove('redmode');
+      document.body.classList.add('voidmode');
+      document.documentElement.style.setProperty('--scan-op', '0.55');
+    }
+    if (Math.random() < 0.4) {
+      document.body.classList.add('glitch');
+      setTimeout(() => document.body.classList.remove('glitch'), 550);
+    }
   }
 
   // Tono al formular la pregunta
@@ -1325,6 +1361,11 @@ function reset() {
   stopAmbient();
   idx = 0; questions = []; answers = []; memory = {}; unsettling = 0;
   locked = false; started = false; hesitationCount = 0; horrorMusicStarted = false;
+  document.body.classList.remove('corrupt', 'redmode', 'voidmode', 'glitch');
+  document.documentElement.style.setProperty('--scan-op', '0.28');
+  const _n = $('noise'), _s = $('scanExtra');
+  if (_n) _n.style.opacity = '0';
+  if (_s) _s.style.opacity = '0';
   document.body.classList.remove('corrupt', 'redmode', 'voidmode', 'glitch');
   document.documentElement.style.setProperty('--scan-op', '0.28');
   ['noise', 'scanExtra', 'vignette'].forEach(id => { const el = $(id); if (el) el.style.opacity = '0'; });
@@ -1890,10 +1931,66 @@ function appendSupLog(logId, text, cls) {
   line.className = 'sup-chat-line ' + (cls || 'sup');
   line.textContent = text;
   log.appendChild(line);
-  // keep last ~12 lines
-  while (log.children.length > 12) log.removeChild(log.firstChild);
+  while (log.children.length > 14) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
+  return line;
 }
+function setSupTalking(on) {
+  ['supFaceBrief', 'supFaceMini', 'supFaceEnd'].forEach(id => {
+    const el = $(id);
+    if (el) el.classList.toggle('talk', !!on);
+  });
+  if (on) setSupFace(supState && supState.horror ? 'horror' : 'mid');
+  else setSupFace(supState && supState.horror ? 'horror' : 'calm');
+}
+/** Efecto escritura como en el test (cola para no solapar) */
+const supTypeQueue = [];
+let supTypeBusy = false;
+function typeSupLine(logId, fullText, cls, speed) {
+  speed = speed || 18;
+  return new Promise(resolve => {
+    supTypeQueue.push({ logId, fullText, cls, speed, resolve });
+    drainSupTypeQueue();
+  });
+}
+function drainSupTypeQueue() {
+  if (supTypeBusy || !supTypeQueue.length) return;
+  supTypeBusy = true;
+  const job = supTypeQueue.shift();
+  typeSupLineNow(job.logId, job.fullText, job.cls, job.speed).then(() => {
+    supTypeBusy = false;
+    job.resolve();
+    drainSupTypeQueue();
+  });
+}
+function typeSupLineNow(logId, fullText, cls, speed) {
+  speed = speed || 18;
+  return new Promise(resolve => {
+    const log = $(logId);
+    if (!log) { resolve(); return; }
+    const line = document.createElement('div');
+    line.className = 'sup-chat-line ' + (cls || 'sup');
+    line.textContent = '';
+    log.appendChild(line);
+    while (log.children.length > 14) log.removeChild(log.firstChild);
+    setSupTalking(true);
+    let i = 0;
+    function tick() {
+      if (i >= fullText.length) {
+        setSupTalking(false);
+        log.scrollTop = log.scrollHeight;
+        resolve();
+        return;
+      }
+      line.textContent += fullText.charAt(i);
+      i++;
+      log.scrollTop = log.scrollHeight;
+      setTimeout(tick, speed + (Math.random() * 8));
+    }
+    tick();
+  });
+}
+
 
 function enterSupervisorMode() {
   if (!allUnitsUnlocked()) {
@@ -1928,14 +2025,19 @@ async function startSupBrief(session) {
   const log = $('supBriefLog');
   if (log) log.innerHTML = '';
   playSupMusic('calm');
+  const wrap = $('supScreen');
+  if (wrap) wrap.classList.remove('horror');
   if (!window.TSSupervisor) return;
-  const intro = TSSupervisor.BRIEF_INTRO || [];
-  for (let i = 0; i < intro.length; i++) {
-    appendSupLog('supBriefLog', 'SUPERVISOR: ' + intro[i], 'sup');
-    await new Promise(r => setTimeout(r, 700));
+  // Primera sesión: intro completa; siguientes: solo mecánica
+  if (session === 1) {
+    const intro = TSSupervisor.BRIEF_INTRO || [];
+    for (let i = 0; i < intro.length; i++) {
+      await typeSupLine('supBriefLog', 'SUPERVISOR: ' + intro[i], 'sup', 16);
+      await new Promise(r => setTimeout(r, 280));
+    }
   }
   const sess = TSSupervisor.BRIEF_SESSION[session] || ('Sesión ' + session);
-  appendSupLog('supBriefLog', 'SUPERVISOR: ' + sess, 'sup');
+  await typeSupLine('supBriefLog', 'SUPERVISOR: ' + sess, 'sup', 16);
 }
 
 function buildSupMap() {
@@ -2015,15 +2117,20 @@ function startSupNight() {
   if (doorBtn) doorBtn.textContent = 'CERRAR PUERTA';
   const camBtn = $('supCamToggle');
   if (camBtn) camBtn.textContent = 'CÁMARAS: OFF';
-  appendSupLog('supPlayLog', 'SUPERVISOR: Canal abierto. Escribe si necesitas algo… o no.', 'sup');
   playSupMusic('calm');
   const wrap = $('supScreen');
   if (wrap) wrap.classList.remove('horror');
+  setSupFace('calm');
   supLast = performance.now();
   supChatCooldown = 0;
   supNearCooldown = 0;
-  supLoop(supLast);
+  supHorrorLatched = false;
+  typeSupLine('supPlayLog', 'SUPERVISOR: Canal abierto. Mira el mapa. Cierra la puerta si se acercan.', 'sup', 16).then(() => {
+    supLoop(performance.now());
+  });
 }
+let supHorrorLatched = false;
+
 
 let supChatCooldown = 0;
 let supNearCooldown = 0;
@@ -2053,27 +2160,35 @@ function supLoop(now) {
   supChatCooldown = Math.max(0, supChatCooldown - dt);
   supNearCooldown = Math.max(0, supNearCooldown - dt);
 
-  const wasHorror = !!supState.horror;
-  const watching = supState.camOpen;
+  const watching = false; // mapa siempre visible; sin panel de cámaras
   TSSupervisor.tick(supState, dt, watching);
 
-  if (supState.horror && !wasHorror) {
+  // Mal rollo Supervisor: exactamente a 3:00 restantes — música + visual juntos
+  if (!supHorrorLatched && supState.timeLeft <= 180) {
+    supHorrorLatched = true;
+    supState.horror = true;
+    // Parar calm y arrancar horror en el mismo frame
+    try {
+      if (supMusic.calm) { supMusic.calm.pause(); }
+    } catch (e) {}
     playSupMusic('horror');
     const wrap = $('supScreen');
     if (wrap) wrap.classList.add('horror');
     setSupFace('horror');
-    appendSupLog('supPlayLog', 'SUPERVISOR: El canal se ensucia. A partir de aquí… improviso.', 'glitch');
+    typeSupLine('supPlayLog', 'SUPERVISOR: El canal se ensucia. A partir de aquí… improviso.', 'glitch', 20);
     sound('glitch');
   }
 
-  // Avisos de cercanía
-  if (supNearCooldown <= 0 && TSSupervisor.anyoneNearDoor(supState) && Math.random() < 0.015) {
-    appendSupLog('supPlayLog', 'SUPERVISOR: ' + TSSupervisor.pickLine(supState, 'near'), supState.horror ? 'glitch' : 'sup');
+  // Avisos de cercanía (con escritura)
+  if (supNearCooldown <= 0 && TSSupervisor.anyoneNearDoor(supState) && Math.random() < 0.012) {
+    const line = TSSupervisor.pickLine(supState, 'near');
+    typeSupLine('supPlayLog', 'SUPERVISOR: ' + line, supState.horror ? 'glitch' : 'sup', 16);
     setSupFace(supState.horror ? 'horror' : 'mid');
-    supNearCooldown = 8 + Math.random() * 6;
-  } else if (supNearCooldown <= 0 && Math.random() < 0.004) {
-    appendSupLog('supPlayLog', 'SUPERVISOR: ' + TSSupervisor.pickLine(supState, 'idle'), supState.horror ? 'glitch' : 'sys');
-    supNearCooldown = 12;
+    supNearCooldown = 10 + Math.random() * 8;
+  } else if (supNearCooldown <= 0 && Math.random() < 0.003) {
+    const line = TSSupervisor.pickLine(supState, 'idle');
+    typeSupLine('supPlayLog', 'SUPERVISOR: ' + line, supState.horror ? 'glitch' : 'sys', 16);
+    supNearCooldown = 14;
   }
 
   renderSupHud();
@@ -2128,14 +2243,11 @@ function sendSupChat() {
   if (!msg) return;
   input.value = '';
   appendSupLog('supPlayLog', 'TÚ: ' + msg, 'you');
-  // respuesta del supervisor
-  setTimeout(() => {
+  setTimeout(async () => {
     if (!supState) return;
     const line = TSSupervisor.pickLine(supState, 'reply');
-    appendSupLog('supPlayLog', 'SUPERVISOR: ' + line, supState.horror ? 'glitch' : 'sup');
-    setSupFace(supState.horror ? 'horror' : 'mid');
-    setTimeout(() => { if (supState && !supState.horror) setSupFace('calm'); }, 1200);
-  }, 400 + Math.random() * 500);
+    await typeSupLine('supPlayLog', 'SUPERVISOR: ' + line, supState.horror ? 'glitch' : 'sup', 16);
+  }, 350 + Math.random() * 400);
 }
 
 
@@ -2185,6 +2297,7 @@ function wireUI() {
     tab.addEventListener('click', () => setSettingsTab(tab.getAttribute('data-panel')));
   });
   on($('introEndingsBtn'), 'click', openEndings);
+  on($('introUnitsBtn'), 'click', openUnits);
   on($('introExtraBtn'), 'click', openExtra);
   on($('extraClose'), 'click', closeExtra);
   on($('extraModal'), 'click', e => { if (e.target === $('extraModal')) closeExtra(); });

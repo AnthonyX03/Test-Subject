@@ -2,14 +2,14 @@
 (function (g) {
   // Nodos del mapa (coordenadas % sobre el área del mapa)
   const NODES = {
-    archivo:     { x: 22, y: 18, label: 'ARCHIVO' },
-    continuidad: { x: 50, y: 12, label: 'CONTINUIDAD' },
-    sala12:      { x: 78, y: 18, label: 'SALA 12' },
-    terminal:    { x: 18, y: 48, label: 'TERMINAL' },
-    hub:         { x: 50, y: 42, label: 'NÚCLEO' },
-    pasillo:     { x: 82, y: 48, label: 'PASILLO' },
-    puerta:      { x: 50, y: 72, label: 'PUERTA' },
-    oficina:     { x: 50, y: 90, label: 'OFICINA' }
+    archivo:     { x: 20, y: 16, label: 'ARCHIVO' },
+    continuidad: { x: 50, y: 10, label: 'CONTINUIDAD' },
+    sala12:      { x: 80, y: 16, label: 'SALA 12' },
+    terminal:    { x: 18, y: 42, label: 'TERMINAL' },
+    hub:         { x: 50, y: 40, label: 'NÚCLEO' },
+    pasillo:     { x: 82, y: 42, label: 'PASILLO' },
+    puerta:      { x: 50, y: 68, label: 'PUERTA' },
+    oficina:     { x: 50, y: 88, label: 'TÚ' }
   };
 
   // Conexiones visuales (líneas)
@@ -152,8 +152,7 @@
     state.aggression = (0.7 + state.session * 0.22) * timeFactor;
     state.horror = state.timeLeft <= 180;
 
-    if (state.doorClosed) state.power -= dt * 0.5;
-    if (state.camOpen) state.power -= dt * 0.22;
+    if (state.doorClosed) state.power -= dt * 0.48;
     if (state.power <= 0) {
       state.power = 0;
       state.doorClosed = false;
