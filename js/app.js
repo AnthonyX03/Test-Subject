@@ -5,7 +5,7 @@
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v7';
-const APP_VERSION = '8.6';
+const APP_VERSION = '8.7';
 
 function getUnitEndings() {
   const u = getActiveUnit();
