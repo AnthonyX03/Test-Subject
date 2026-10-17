@@ -123,7 +123,7 @@ h2{font-size:14px;letter-spacing:.15em;font-weight:500;color:#72b984}
 .modal label.opt input{accent-color:var(--green)}
 .modal label.opt.active{border-color:#4d8b60;color:var(--green)}
 .modal .hint{font-size:10px;color:#52745b;line-height:1.5;margin-top:6px}
-.modal .ending-list{display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.modal .ending-list{display:flex;flex-direction:column;gap:8px;overflow:visible}
 .modal .ending-item{border:1px solid #1d3b26;padding:10px 12px;font-size:11px;line-height:1.5;background:#07100a;color:#6a8a72}
 .modal .ending-item.unlocked{border-color:#3a6a45;color:#b0d4b8}
 .modal .ending-item .etitle{letter-spacing:.1em;margin-bottom:4px;font-weight:600}
@@ -208,7 +208,34 @@ body:not(.layout-pc) .topbar{font-size:9px}
 .intro .ai-line{font-size:11px;color:#5a8a68;letter-spacing:.1em;margin:8px 0 14px;font-style:normal}
 .intro .controls{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:18px}
 .intro .controls .button{min-width:140px}
-.ending-list{max-height:55vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#4d8b60 #0a100d}
+.ending-list{max-height:none;overflow:visible}
+
+
+.mg-overlay{position:fixed;inset:0;z-index:70;background:#050806f2;display:none;align-items:center;justify-content:center;padding:16px}
+.mg-overlay.open{display:flex}
+.mg-box{background:#0a100d;border:1px solid #2a4a32;max-width:520px;width:100%;max-height:90dvh;overflow:auto;padding:20px;color:#b0d4b8}
+.mg-title{font-size:13px;letter-spacing:.16em;color:var(--green,#7dff9a);margin-bottom:8px}
+.mg-sub{font-size:11px;color:#6a8a72;margin-bottom:14px}
+.mg-hack-grid,.mg-decrypt-pool,.mg-seq-pad{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.mg-word,.mg-seq-btn{border:1px solid #2a4a32;background:#07100a;color:#9ed4aa;padding:8px 10px;font-size:12px;cursor:pointer;letter-spacing:.06em}
+.mg-word:hover,.mg-seq-btn:hover{border-color:#4d8b60}
+.mg-word:disabled{opacity:.35}
+.mg-log{font-size:11px;color:#8ab89a;min-height:1.4em;margin-top:8px}
+.mg-board{display:flex;flex-direction:column;gap:6px;margin:12px 0}
+.mg-row{display:flex;gap:6px;justify-content:center}
+.mg-cell{width:36px;height:36px;border:1px solid #2a4a32;display:grid;place-items:center;font-size:14px;font-weight:600}
+.mg-cell.ok{background:#1a4a28;border-color:#4d8b60;color:#b0ffc0}
+.mg-cell.mid{background:#4a4010;border-color:#8a7a30;color:#ffe08a}
+.mg-cell.bad{background:#1a1010;border-color:#4a2020;color:#886}
+.mg-input{width:100%;background:#07100a;border:1px solid #2a4a32;color:#c0e8c8;padding:10px;font-size:14px;letter-spacing:.2em;text-transform:uppercase}
+.mg-seq-display{font-size:28px;text-align:center;padding:16px;letter-spacing:.3em;color:var(--green,#7dff9a)}
+.mg-decrypt-out{font-size:16px;letter-spacing:.2em;text-align:center;margin:12px 0;color:#c0e8c8}
+.mg-signal-track{position:relative;height:28px;background:#07100a;border:1px solid #2a4a32;margin:16px 0;overflow:hidden}
+.mg-signal-zone{position:absolute;top:0;bottom:0;background:#1a4a2844;border-left:1px solid #4d8b60;border-right:1px solid #4d8b60}
+.mg-signal-marker{position:absolute;top:0;bottom:0;width:4px;background:var(--green,#7dff9a);transform:translateX(-50%)}
+.shop-item,.unit-item{border:1px solid #1d3b26;padding:12px;margin-bottom:8px;background:#07100a}
+.shop-item .price,.unit-item .price{color:#d4b86a;font-size:11px;letter-spacing:.1em}
+.ce-badge{font-size:10px;letter-spacing:.12em;color:#d4b86a}
 
 </style>
 </head>
@@ -219,7 +246,7 @@ body:not(.layout-pc) .topbar{font-size:9px}
   <div class="ag-sub">El navegador bloquea el sonido hasta un toque. Después la música arranca sola.</div>
 </div>
 
-<div class="version-badge" id="versionBadge">v6.0</div>
+<div class="version-badge" id="versionBadge">v7.1</div>
 <div class="noise" id="noise"></div>
 <div class="scanline-extra" id="scanExtra"></div>
 <div class="vignette-pulse" id="vignette"></div>
@@ -242,7 +269,15 @@ body:not(.layout-pc) .topbar{font-size:9px}
             <label class="opt" id="optSoundOn"><input type="radio" name="snd" value="on"> ACTIVADO</label>
             <label class="opt" id="optSoundOff"><input type="radio" name="snd" value="off"> DESACTIVADO</label>
           </div>
-          <p class="hint">Música y efectos. Recomendado con auriculares. El navegador exige un toque inicial.</p>
+          <div style="margin-top:14px">
+            <h4>MÚSICA <span id="musicVolLabel">55%</span></h4>
+            <input type="range" id="musicVol" min="0" max="100" value="55" style="width:100%;accent-color:#4d8b60">
+          </div>
+          <div style="margin-top:12px">
+            <h4>EFECTOS <span id="sfxVolLabel">70%</span></h4>
+            <input type="range" id="sfxVol" min="0" max="100" value="70" style="width:100%;accent-color:#4d8b60">
+          </div>
+          <p class="hint">Silenciar corta todo. Los deslizadores ajustan el volumen por separado.</p>
         </section>
       </div>
       <div class="settings-panel" id="panelLayout">
@@ -278,15 +313,15 @@ body:not(.layout-pc) .topbar{font-size:9px}
       <div class="close-row">
         <button type="button" class="button" id="settingsClose">CERRAR</button>
       </div>
-      <p class="version-in" id="settingsVersion">v6.0</p>
+      <p class="version-in" id="settingsVersion">v7.1</p>
     </div>
   </div>
 </div>
 
 <div class="modal-bg" id="endingsModal" role="dialog" aria-modal="true" aria-label="Finales">
-  <div class="modal" style="max-height:none;overflow:hidden">
+  <div class="modal" style="max-height:88dvh">
     <div class="modal-head"><h3>◈ FINALES DESCUBIERTOS</h3></div>
-    <div class="modal-body" style="overflow:hidden;padding-bottom:8px">
+    <div class="modal-body" style="overflow-y:auto;flex:1;max-height:60vh;padding-bottom:8px">
       <div class="ending-list" id="endingList"></div>
     </div>
     <div class="modal-foot">
@@ -320,12 +355,34 @@ body:not(.layout-pc) .topbar{font-size:9px}
   <div class="modal">
     <div class="modal-head"><h3>◈ EXTRA</h3></div>
     <div class="modal-body">
+      <p class="ce-badge" id="ceDisplay">CRÉDITOS DE EVALUACIÓN (CE): 0</p>
       <section>
         <h4>ARCHIVO</h4>
         <div class="row">
-          <button type="button" class="button" id="openDocsBtn">DOCUMENTOS <span id="docsCount">(0/50)</span></button>
+          <button type="button" class="button" id="openDocsBtn">DOCUMENTOS <span id="docsCount">(0/55)</span></button>
         </div>
-        <p class="hint">Informes, entrevistas y residuos del Protocolo 09. Se desbloquean al hablar con la Unidad 04.</p>
+        <p class="hint">Expedientes de la U.E.C. Algunos se abren al avanzar; otros se compran con CE.</p>
+      </section>
+      <section>
+        <h4>ECONOMÍA</h4>
+        <div class="row">
+          <button type="button" class="button" id="openShopBtn">TIENDA</button>
+        </div>
+        <p class="hint">Gasta CE en documentos raros y en otras unidades de entrevista.</p>
+      </section>
+      <section>
+        <h4>OPERADORES</h4>
+        <div class="row">
+          <button type="button" class="button" id="openUnitsBtn">UNIDADES</button>
+        </div>
+        <p class="hint">Cada unidad cambia tono, color, cara, preguntas y finales.</p>
+      </section>
+      <section>
+        <h4>PRUEBAS</h4>
+        <div class="row">
+          <button type="button" class="button" id="openMgBtn">MINIJUEGOS</button>
+        </div>
+        <p class="hint">Se desbloquean al superarlos en una entrevista. Aquí se practican sin CE.</p>
       </section>
     </div>
     <div class="modal-foot">
@@ -365,6 +422,35 @@ body:not(.layout-pc) .topbar{font-size:9px}
   <div class="t-sub" id="toastSub">Añadido al archivo EXTRA</div>
 </div>
 
+
+<div class="modal-bg" id="shopModal" role="dialog" aria-modal="true" aria-label="Tienda">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head"><h3>◈ TIENDA · CE <span id="shopCe">0</span></h3></div>
+    <div class="modal-body">
+      <div id="shopList"></div>
+    </div>
+    <div class="modal-foot"><div class="close-row"><button type="button" class="button" id="shopClose">CERRAR</button></div></div>
+  </div>
+</div>
+<div class="modal-bg" id="unitsModal" role="dialog" aria-modal="true" aria-label="Unidades">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head"><h3>◈ UNIDADES</h3></div>
+    <div class="modal-body">
+      <div id="unitsList"></div>
+    </div>
+    <div class="modal-foot"><div class="close-row"><button type="button" class="button" id="unitsClose">CERRAR</button></div></div>
+  </div>
+</div>
+<div class="modal-bg" id="mgListModal" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head"><h3>◈ MINIJUEGOS</h3></div>
+    <div class="modal-body"><div id="mgList"></div></div>
+    <div class="modal-foot"><div class="close-row"><button type="button" class="button" id="mgListClose">CERRAR</button></div></div>
+  </div>
+</div>
+<div class="mg-overlay" id="mgOverlay">
+  <div class="mg-box" id="mgRoot"></div>
+</div>
 <main class="app">
   <header class="topbar">
     <div class="brand">◈ TEST SUBJECT</div>
@@ -453,8 +539,10 @@ body:not(.layout-pc) .topbar{font-size:9px}
   </footer>
 </main>
 
-<script src="js/documents.js?v=6.0"></script>
-<script src="js/questions.js?v=6.0"></script>
-<script src="js/app.js?v=6.0"></script>
+<script src="js/units.js?v=7.1"></script>
+<script src="js/minigames.js?v=7.1"></script>
+<script src="js/documents.js?v=7.1"></script>
+<script src="js/questions.js?v=7.1"></script>
+<script src="js/app.js?v=7.1"></script>
 </body>
 </html>
