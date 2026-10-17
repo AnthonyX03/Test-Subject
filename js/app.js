@@ -5,7 +5,7 @@
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v7';
-const APP_VERSION = '8.0';
+const APP_VERSION = '8.1';
 
 function getUnitEndings() {
   const u = getActiveUnit();
@@ -44,20 +44,44 @@ function applyUnitTheme() {
   const u = getActiveUnit();
   const c = u.colors || {};
   const root = document.documentElement;
+  const set = (k, v) => { if (v) root.style.setProperty(k, v); };
+  set('--green', c.green);
+  set('--bg', c.bg);
+  set('--panel', c.panel);
+  set('--border', c.border);
+  set('--dim', c.dim);
+  set('--text', c.text || c.green);
+  set('--muted', c.muted || c.dim);
   if (c.bg) document.body.style.background = c.bg;
-  if (c.green) root.style.setProperty('--green', c.green);
+  if (c.green) document.body.style.color = c.text || '#b0d4b8';
+  // Force key elements
+  document.querySelectorAll('.button').forEach(el => {
+    el.style.borderColor = c.border || '';
+    el.style.color = c.green || '';
+  });
+  document.querySelectorAll('.topbar,.modal,.shop-item,.unit-item,.ending-item').forEach(el => {
+    if (c.border) el.style.borderColor = c.border;
+    if (c.panel && el.classList.contains('modal')) el.style.background = c.panel;
+  });
   const h2 = document.querySelector('#intro h2');
   const line = $('introAiLine');
   const sub = document.querySelector('#intro .sub');
   if (h2 && u.intro) h2.textContent = u.intro.h2 || h2.textContent;
-  if (line && u.intro) line.textContent = u.intro.line || '';
+  if (line && u.intro) {
+    line.textContent = u.intro.line || '';
+    line.style.color = c.green || '';
+  }
   if (sub && u.intro && u.intro.body) {
     sub.innerHTML = u.intro.body.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
   }
   const brand = document.querySelector('.brand');
-  if (brand) brand.textContent = '◈ ' + (u.name || 'TEST SUBJECT');
+  if (brand) {
+    brand.textContent = '◈ ' + (u.name || 'TEST SUBJECT');
+    brand.style.color = c.green || '';
+  }
   applyUnitFace('calm');
   updateSettingsUI();
+  refreshSupervisorBtn();
 }
 function applyUnitFace(level) {
   const u = getActiveUnit();
@@ -424,8 +448,11 @@ function updateSettingsUI() {
     const div = document.createElement('div');
     div.className = 'ending-item ' + (unlocked ? 'unlocked' : 'locked');
     div.innerHTML = unlocked
-      ? '<div class="etitle">' + def.title + '</div><div>' + def.blurb + '</div>'
+      ? '<div class="etitle">' + def.title + '</div><div>' + def.blurb + '</div><div class="hint" style="margin-top:6px">Pulsa para leer el informe del cierre</div>'
       : '<div class="etitle">🔒 ???</div><div>Final aún no descubierto.</div>';
+    if (unlocked) {
+      div.onclick = () => openEndingDetail(def);
+    }
     list.appendChild(div);
   });
 
@@ -440,6 +467,37 @@ function closeSettings() {
   const m = $('settingsModal');
   if (m) m.classList.remove('open');
 }
+
+function getEndingLore(def) {
+  if (!def) return '';
+  if (def.lore) return def.lore;
+  const u = getActiveUnit();
+  const unitName = (u && u.name) || 'la Unidad';
+  return (
+    def.title + '\n\n' +
+    def.blurb + '\n\n' +
+    '— Informe de cierre · ' + unitName + ' —\n\n' +
+    'Llegaste a este final por la combinación de tono de la sesión, documentos abiertos, ' +
+    'reincidencias y el modo en que respondiste cuando el protocolo dejó de fingir cordialidad.\n\n' +
+    'No hay una única ruta publicada. La U.E.C. solo archiva el resultado: ' +
+    'que completaste la evaluación bajo ' + unitName + ' y que el expediente quedó en este estado.\n\n' +
+    'Si vuelves a evaluar, el sistema puede reconocer ecos de esta sesión… o fingir que es la primera vez.\n\n' +
+    'ESTADO: REGISTRADO · NO GARANTIZA CIERRE DEFINITIVO'
+  );
+}
+function openEndingDetail(def) {
+  const m = $('endingDetailModal');
+  const t = $('endingDetailTitle');
+  const b = $('endingDetailBody');
+  if (t) t.textContent = '◈ ' + (def.title || 'FINAL');
+  if (b) b.textContent = getEndingLore(def);
+  if (m) m.classList.add('open');
+}
+function closeEndingDetail() {
+  const m = $('endingDetailModal');
+  if (m) m.classList.remove('open');
+}
+
 function openEndings() {
   updateSettingsUI();
   const m = $('endingsModal');
@@ -1437,6 +1495,7 @@ function closeDocs() {
 function openExtra() {
   updateDocsUI();
   updateCEUI();
+  refreshSupervisorBtn();
   const m = $('extraModal');
   if (m) m.classList.add('open');
 }
@@ -1461,7 +1520,15 @@ function openShop() {
   const list = $('shopList');
   if (!list) return;
   list.innerHTML = '';
-  // Documents
+
+  const sec = (title) => {
+    const h = document.createElement('div');
+    h.className = 'shop-section-title';
+    h.textContent = title;
+    list.appendChild(h);
+  };
+
+  sec('DOCUMENTOS');
   const shopDocs = (window.TSDocuments && TSDocuments.SHOP_DOCS) || [];
   shopDocs.forEach(item => {
     const doc = TSDocuments.getDoc(item.id);
@@ -1489,9 +1556,10 @@ function openShop() {
     }
     list.appendChild(div);
   });
-  // Units in shop
+
+  sec('UNIDADES');
   if (window.TSUnits) {
-    TSUnits.listUnits().forEach(u => {
+    TSUnits.listUnits().slice().sort((a,b)=>Number(a.code)-Number(b.code)).forEach(u => {
       if (u.id === 'u04') return;
       const owned = (saveData.unlockedUnits || []).includes(u.id);
       const div = document.createElement('div');
@@ -1510,6 +1578,7 @@ function openShop() {
           if (!saveData.unlockedUnits.includes(u.id)) saveData.unlockedUnits.push(u.id);
           persist();
           updateCEUI();
+          refreshSupervisorBtn();
           openShop();
           showSysMsg(u.name + ' DISPONIBLE', 2200);
         };
@@ -1652,9 +1721,13 @@ function allUnitsUnlocked() {
 }
 function refreshSupervisorBtn() {
   const b = $('supervisorBtn');
-  if (!b) return;
-  if (allUnitsUnlocked()) b.classList.add('show');
-  else b.classList.remove('show');
+  if (!b) {
+    console.warn('[TS] supervisorBtn no encontrado en DOM');
+    return;
+  }
+  const ok = allUnitsUnlocked();
+  b.classList.toggle('show', ok);
+  b.style.display = ok ? 'inline-block' : 'none';
 }
 function openCreator() {
   const m = $('creatorModal');
@@ -1956,6 +2029,9 @@ function wireUI() {
 
   on($('openEndingsBtn'), 'click', openEndings);
   on($('endingsClose'), 'click', closeEndings);
+  on($('endingDetailClose'), 'click', closeEndingDetail);
+  on($('endingDetailModal'), 'click', e => { if (e.target === $('endingDetailModal')) closeEndingDetail(); });
+
   on($('endingsModal'), 'click', e => {
     if (e.target === $('endingsModal')) closeEndings();
   });
