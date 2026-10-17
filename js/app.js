@@ -5,7 +5,7 @@
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v7';
-const APP_VERSION = '7.1';
+const APP_VERSION = '8.0';
 
 function getUnitEndings() {
   const u = getActiveUnit();
@@ -905,6 +905,7 @@ function begin() {
   sessionHorrorAt = 13 + Math.floor(Math.random() * 3);
   horrorMusicStarted = false;
   applyUnitTheme();
+refreshSupervisorBtn();
 
   const picked = window.TSQuestions.pickSessionQuestions(Object.assign({}, saveData.past, { playCount: saveData.playCount }), 20, saveData.activeUnit || 'u04');
   questions = picked.questions;
@@ -1526,7 +1527,7 @@ function openUnits() {
   const list = $('unitsList');
   if (!list || !window.TSUnits) return;
   list.innerHTML = '';
-  TSUnits.listUnits().forEach(u => {
+  TSUnits.listUnits().slice().sort((a,b)=>Number(a.code)-Number(b.code)).forEach(u => {
     const owned = (saveData.unlockedUnits || ['u04']).includes(u.id);
     const active = saveData.activeUnit === u.id;
     const div = document.createElement('div');
@@ -1641,7 +1642,286 @@ function openMinigamesExtra() {
 
 
 
+
+/* ========== CREADOR + SUPERVISOR ========== */
+function allUnitsUnlocked() {
+  if (!window.TSUnits) return false;
+  const need = TSUnits.listUnits().map(u => u.id);
+  const have = saveData.unlockedUnits || [];
+  return need.every(id => have.includes(id));
+}
+function refreshSupervisorBtn() {
+  const b = $('supervisorBtn');
+  if (!b) return;
+  if (allUnitsUnlocked()) b.classList.add('show');
+  else b.classList.remove('show');
+}
+function openCreator() {
+  const m = $('creatorModal');
+  if (m) m.classList.add('open');
+  const st = $('creatorStatus');
+  if (st) st.textContent = '';
+}
+function closeCreator() {
+  const m = $('creatorModal');
+  if (m) m.classList.remove('open');
+}
+function creatorUnlockAll() {
+  // Unidades
+  if (window.TSUnits) {
+    saveData.unlockedUnits = TSUnits.listUnits().map(u => u.id);
+  }
+  // Documentos
+  if (window.TSDocuments) {
+    saveData.documents = TSDocuments.DOCS.map(d => d.id);
+  }
+  // Minijuegos
+  if (window.TSMinigames) {
+    saveData.unlockedMinigames = TSMinigames.TYPES.map(t => t.id);
+  }
+  // Finales de todas las unidades
+  if (window.TSUnits) {
+    const ends = [];
+    TSUnits.listUnits().forEach(u => {
+      (u.endings || []).forEach(e => ends.push(u.id + ':' + e.id));
+    });
+    saveData.discoveredEndings = ends;
+  }
+  saveData.ce = Math.max(saveData.ce || 0, 999);
+  persist();
+  updateDocsUI();
+  updateCEUI();
+  updateSettingsUI();
+  refreshSupervisorBtn();
+  const st = $('creatorStatus');
+  if (st) st.textContent = 'Todo desbloqueado. Modo Supervisor disponible en la intro.';
+  showSysMsg('ACCESO CREADOR · TODO DESBLOQUEADO', 3000);
+}
+
+let supState = null;
+let supRaf = null;
+let supLast = 0;
+let supMusic = { calm: null, horror: null, current: null };
+let supSession = 1;
+
+function initSupMusic() {
+  if (!supMusic.calm) {
+    supMusic.calm = new Audio('audio/SUPERVISOR.mp3');
+    supMusic.calm.loop = true;
+    supMusic.calm.volume = getMusicVol();
+  }
+  if (!supMusic.horror) {
+    supMusic.horror = new Audio('audio/SUPERVISORHORROR.mp3');
+    supMusic.horror.loop = true;
+    supMusic.horror.volume = getMusicVol();
+  }
+}
+function stopSupMusic() {
+  [supMusic.calm, supMusic.horror].forEach(a => {
+    if (!a) return;
+    try { a.pause(); a.currentTime = 0; } catch (e) {}
+  });
+  supMusic.current = null;
+}
+function playSupMusic(which) {
+  if (!audioOn) return;
+  initSupMusic();
+  const next = which === 'horror' ? supMusic.horror : supMusic.calm;
+  const prev = supMusic.current;
+  if (prev === next && next && !next.paused) return;
+  if (prev && prev !== next) { try { prev.pause(); prev.currentTime = 0; } catch (e) {} }
+  next.volume = getMusicVol();
+  supMusic.current = next;
+  try { next.play().catch(() => {}); } catch (e) {}
+}
+
+function showSupPhase(name) {
+  ['supBriefPhase', 'supPlayPhase', 'supEndPhase'].forEach(id => {
+    const el = $(id);
+    if (el) el.style.display = id === name ? '' : 'none';
+  });
+}
+function enterSupervisorMode() {
+  if (!allUnitsUnlocked()) {
+    showSysMsg('REQUIERE TODAS LAS UNIDADES', 2500, true);
+    return;
+  }
+  stopAllMusic();
+  const intro = $('intro'), game = $('game'), ending = $('ending'), sup = $('supScreen');
+  if (intro) intro.style.display = 'none';
+  if (game) game.style.display = 'none';
+  if (ending) { ending.classList.add('hidden'); ending.style.display = 'none'; }
+  if (sup) { sup.classList.add('active'); sup.style.display = 'flex'; }
+  supSession = 1;
+  startSupBrief(1);
+}
+function exitSupervisorMode() {
+  if (supRaf) cancelAnimationFrame(supRaf);
+  supRaf = null;
+  stopSupMusic();
+  const sup = $('supScreen');
+  if (sup) { sup.classList.remove('active'); sup.style.display = 'none'; }
+  const intro = $('intro');
+  if (intro) intro.style.display = '';
+  if (audioOn) unlockAndStartCalm();
+}
+function startSupBrief(session) {
+  supSession = session;
+  showSupPhase('supBriefPhase');
+  const t = $('supBriefText');
+  const brief = (window.TSSupervisor && TSSupervisor.BRIEF[session]) || ('Sesión ' + session);
+  if (t) t.textContent = 'SUPERVISOR:\n\n' + brief + '\n\n«No dejes que te capturen. Si una unidad llega a la oficina con la puerta abierta, el expediente te marca como recuperado.»';
+  playSupMusic('calm');
+}
+function startSupNight() {
+  if (!window.TSSupervisor) return;
+  supState = TSSupervisor.createState(supSession);
+  showSupPhase('supPlayPhase');
+  // cámaras
+  const cams = $('supCams');
+  if (cams) {
+    cams.innerHTML = '';
+    TSSupervisor.LOCS.filter(l => l !== 'oficina').forEach(loc => {
+      const b = document.createElement('button');
+      b.className = 'button';
+      b.textContent = TSSupervisor.LOC_LABEL[loc] || loc;
+      b.onclick = () => {
+        if (!supState || !supState.camOpen) return;
+        supState.cam = loc;
+        renderSupCam();
+      };
+      cams.appendChild(b);
+    });
+  }
+  const doorBtn = $('supDoorBtn');
+  if (doorBtn) doorBtn.textContent = 'CERRAR PUERTA';
+  supLast = performance.now();
+  playSupMusic('calm');
+  supLoop(supLast);
+}
+function renderSupCam() {
+  if (!supState || !window.TSSupervisor) return;
+  const v = TSSupervisor.camView(supState);
+  const el = $('supCamView');
+  if (!el) return;
+  if (!supState.camOpen) {
+    el.textContent = 'Panel de cámaras cerrado.';
+    return;
+  }
+  let txt = 'CAM · ' + v.label + '\n';
+  if (v.units.length) txt += 'Detectado: ' + v.units.join(', ');
+  else if (v.hint) txt += v.hint;
+  else txt += 'Sin movimiento aparente.';
+  el.textContent = txt;
+}
+function renderSupHud() {
+  if (!supState) return;
+  const ss = $('supSession');
+  if (ss) ss.textContent = supState.session + '/5';
+  const t = Math.max(0, Math.ceil(supState.timeLeft));
+  const mm = String(Math.floor(t / 60));
+  const sec = String(t % 60).padStart(2, '0');
+  const st = $('supTime');
+  if (st) st.textContent = mm + ':' + sec;
+  const pw = $('supPower');
+  if (pw) pw.textContent = Math.max(0, Math.floor(supState.power)) + '%';
+  const dl = $('supDoorLabel');
+  if (dl) dl.textContent = 'PUERTA: ' + (supState.doorClosed ? 'CERRADA' : 'ABIERTA');
+  // En oficina: si hay unidades rechazadas no se ve, si poder 0 aviso
+  const office = $('supOffice');
+  if (office && supState.power <= 0) {
+    office.style.borderColor = '#6a3030';
+  }
+}
+function supLoop(now) {
+  if (!supState) return;
+  const dt = Math.min(0.1, (now - supLast) / 1000);
+  supLast = now;
+  // Música: primeros 3 min calm, luego horror
+  if (supState.timeLeft <= 180 && supMusic.current !== supMusic.horror) {
+    playSupMusic('horror');
+  }
+  const watching = supState.camOpen;
+  TSSupervisor.tick(supState, dt, watching);
+  renderSupHud();
+  if (supState.camOpen) renderSupCam();
+  if (supState.dead) {
+    endSupNight(false);
+    return;
+  }
+  if (supState.won) {
+    endSupNight(true);
+    return;
+  }
+  supRaf = requestAnimationFrame(supLoop);
+}
+function endSupNight(won) {
+  if (supRaf) cancelAnimationFrame(supRaf);
+  supRaf = null;
+  showSupPhase('supEndPhase');
+  const title = $('supEndTitle');
+  const text = $('supEndText');
+  if (won) {
+    if (title) title.textContent = 'SESIÓN ' + supSession + ' SUPERADA';
+    if (text) text.textContent = supSession >= 5
+      ? 'Las cinco unidades fueron contenidas. El Supervisor cierra el terminal… por ahora. El archivo sigue abierto.'
+      : 'Aguantaste 6 minutos. Prepárate: en la siguiente sesión habrá una unidad más.';
+    const next = $('supNext');
+    if (next) next.style.display = supSession >= 5 ? 'none' : '';
+  } else {
+    if (title) title.textContent = 'RECUPERADO';
+    if (text) text.textContent = (supState && supState.killedBy ? supState.killedBy : 'Una unidad') +
+      ' alcanzó la oficina. El expediente te marca como sujeto recuperado. La sesión se reinicia.';
+    const next = $('supNext');
+    if (next) next.textContent = 'REINTENTAR SESIÓN';
+    if (next) next.style.display = '';
+  }
+  stopSupMusic();
+}
+function supContinue() {
+  if (supState && supState.won && supSession < 5) {
+    startSupBrief(supSession + 1);
+  } else if (supState && !supState.won) {
+    startSupBrief(supSession);
+  } else {
+    exitSupervisorMode();
+  }
+}
+
+
 function wireUI() {
+
+  const vb = $('versionBadge');
+  if (vb) {
+    vb.style.pointerEvents = 'auto';
+    vb.style.cursor = 'pointer';
+    on(vb, 'click', openCreator);
+  }
+  on($('creatorClose'), 'click', closeCreator);
+  on($('creatorModal'), 'click', e => { if (e.target === $('creatorModal')) closeCreator(); });
+  on($('creatorUnlockAll'), 'click', creatorUnlockAll);
+  on($('creatorGiveCE'), 'click', () => { saveData.ce = (saveData.ce || 0) + 500; persist(); updateCEUI(); showSysMsg('+500 CE', 1500); });
+  on($('supervisorBtn'), 'click', enterSupervisorMode);
+  on($('supStartNight'), 'click', startSupNight);
+  on($('supAbortBrief'), 'click', exitSupervisorMode);
+  on($('supAbortPlay'), 'click', () => { if (supRaf) cancelAnimationFrame(supRaf); exitSupervisorMode(); });
+  on($('supExit'), 'click', exitSupervisorMode);
+  on($('supNext'), 'click', supContinue);
+  on($('supDoorBtn'), 'click', () => {
+    if (!supState || supState.power <= 0) return;
+    supState.doorClosed = !supState.doorClosed;
+    const b = $('supDoorBtn');
+    if (b) b.textContent = supState.doorClosed ? 'ABRIR PUERTA' : 'CERRAR PUERTA';
+    renderSupHud();
+  });
+  on($('supCamToggle'), 'click', () => {
+    if (!supState || supState.power <= 0) return;
+    supState.camOpen = !supState.camOpen;
+    const b = $('supCamToggle');
+    if (b) b.textContent = supState.camOpen ? 'CERRAR CÁMARAS' : 'CÁMARAS';
+    renderSupCam();
+  });
+
   on($('settingsOpen'), 'click', openSettings);
   on($('settingsOpen2'), 'click', openSettings);
   on($('settingsOpen3'), 'click', openSettings);
@@ -1744,6 +2024,7 @@ function wireUI() {
       if ($('clearConfirmModal') && $('clearConfirmModal').classList.contains('open')) closeClearConfirm();
       else if ($('docReaderModal') && $('docReaderModal').classList.contains('open')) closeDocReader();
       else if ($('docsModal') && $('docsModal').classList.contains('open')) closeDocs();
+      else if ($('creatorModal') && $('creatorModal').classList.contains('open')) closeCreator();
       else if ($('shopModal') && $('shopModal').classList.contains('open')) closeShop();
       else if ($('unitsModal') && $('unitsModal').classList.contains('open')) closeUnits();
       else if ($('extraModal') && $('extraModal').classList.contains('open')) closeExtra();
