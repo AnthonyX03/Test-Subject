@@ -1,9 +1,10 @@
-/* TEST SUBJECT — Service Worker v5.2 */
-const CACHE = 'ts-09-v5.2';
+/* TEST SUBJECT — Service Worker v6.0 */
+const CACHE = 'ts-09-v6.0';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './js/documents.js',
   './js/questions.js',
   './js/app.js',
   './audio/TEST.mp3',

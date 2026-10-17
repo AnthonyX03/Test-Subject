@@ -185,6 +185,31 @@ body:not(.layout-pc) .topbar{font-size:9px}
 .audio-gate .ag-btn{border:1px solid #3a6a45;background:#0a1810;color:#9ed4aa;padding:14px 28px;font-size:12px;letter-spacing:.16em;cursor:pointer}
 .audio-gate .ag-btn:active{background:#122818}
 
+
+.settings-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.settings-tabs .tab{flex:1;min-width:90px;text-align:center;padding:10px 8px;font-size:10px;letter-spacing:.12em;border:1px solid #1d3b26;background:#07100a;color:#6a8a72;cursor:pointer}
+.settings-tabs .tab.active{border-color:#4d8b60;color:#9ed4aa;background:#0c1a10}
+.settings-panel{display:none}
+.settings-panel.active{display:block}
+.toast-ach{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-120%);background:#0a120c;border:1px solid #3a6a45;padding:12px 18px;z-index:80;min-width:260px;max-width:92vw;opacity:0;transition:transform .35s,opacity .35s;box-shadow:0 0 24px #001a0a}
+.toast-ach.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast-ach .t-label{font-size:9px;letter-spacing:.18em;color:#5f8d69;margin-bottom:4px}
+.toast-ach .t-title{font-size:12px;color:#b0d4b8;letter-spacing:.06em}
+.toast-ach .t-sub{font-size:10px;color:#6a8a72;margin-top:4px}
+.doc-list{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#4d8b60 #0a100d}
+.doc-item{border:1px solid #1d3b26;padding:10px 12px;background:#07100a;cursor:pointer;text-align:left}
+.doc-item.locked{opacity:.4;cursor:default}
+.doc-item.unlocked{border-color:#2a4a32}
+.doc-item .dcat{font-size:9px;letter-spacing:.14em;color:#5f8d69}
+.doc-item .dtitle{font-size:12px;color:#9ebba4;margin-top:3px}
+.doc-item.unlocked .dtitle{color:#c0e8c8}
+.doc-reader{white-space:pre-wrap;font-size:12px;line-height:1.7;color:#a8c8b0;max-height:50vh;overflow-y:auto}
+.intro .sigil{margin-bottom:8px}
+.intro .ai-line{font-size:11px;color:#5a8a68;letter-spacing:.1em;margin:8px 0 14px;font-style:normal}
+.intro .controls{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:18px}
+.intro .controls .button{min-width:140px}
+.ending-list{max-height:55vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#4d8b60 #0a100d}
+
 </style>
 </head>
 <body>
@@ -194,7 +219,7 @@ body:not(.layout-pc) .topbar{font-size:9px}
   <div class="ag-sub">El navegador bloquea el sonido hasta un toque. Después la música arranca sola.</div>
 </div>
 
-<div class="version-badge" id="versionBadge">v5.2</div>
+<div class="version-badge" id="versionBadge">v6.0</div>
 <div class="noise" id="noise"></div>
 <div class="scanline-extra" id="scanExtra"></div>
 <div class="vignette-pulse" id="vignette"></div>
@@ -205,51 +230,55 @@ body:not(.layout-pc) .topbar{font-size:9px}
   <div class="modal">
     <div class="modal-head"><h3>◈ AJUSTES</h3></div>
     <div class="modal-body">
-      <section>
-        <h4>SONIDO</h4>
-        <div class="row">
-          <label class="opt" id="optSoundOn"><input type="radio" name="snd" value="on"> ACTIVADO</label>
-          <label class="opt" id="optSoundOff"><input type="radio" name="snd" value="off"> DESACTIVADO</label>
-        </div>
-        <p class="hint">Activa el audio (música + efectos). Recomendado con auriculares.</p>
-      </section>
-      <section>
-        <h4>ADAPTABILIDAD</h4>
-        <div class="row">
-          <label class="opt" id="optLayoutAuto"><input type="radio" name="lay" value="auto"> AUTOMÁTICO</label>
-          <label class="opt" id="optLayoutMobile"><input type="radio" name="lay" value="mobile"> MODO MÓVIL</label>
-          <label class="opt" id="optLayoutPc"><input type="radio" name="lay" value="pc"> MODO PC</label>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <button type="button" class="button" id="fullscreenBtn">PANTALLA COMPLETA (PC)</button>
-        </div>
-        <p class="hint">Cambia el tamaño de la interfaz. Pantalla completa recomendada en PC.</p>
-      </section>
-      <section>
-        <h4>PARTIDA</h4>
-        <div class="row">
-          <button type="button" class="button" id="exportBtn">EXPORTAR PARTIDA</button>
-          <button type="button" class="button" id="importBtn">IMPORTAR PARTIDA</button>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <button type="button" class="button" id="clearMemoryBtn" style="border-color:#6a3030;color:#ff9090">BORRAR MEMORIA Y CACHÉ</button>
-        </div>
-        <input type="file" id="importFile" accept="application/json,.json" class="hidden">
-        <p class="hint">Exporta o importa finales y memoria. «Borrar memoria» limpia datos locales y caché, luego reinicia la página (útil tras actualizar).</p>
-      </section>
-      <section>
-        <h4>FINALES</h4>
-        <div class="row">
-          <button type="button" class="button" id="openEndingsBtn">VER FINALES <span id="endingCount">(0/5)</span></button>
-        </div>
-        <p class="hint">Se desbloquean al terminar cada evaluación.</p>
-      </section>
+      <div class="settings-tabs" id="settingsTabs">
+        <button type="button" class="tab active" data-panel="panelSound">SONIDO</button>
+        <button type="button" class="tab" data-panel="panelLayout">ADAPTABILIDAD</button>
+        <button type="button" class="tab" data-panel="panelSave">PARTIDA</button>
+      </div>
+      <div class="settings-panel active" id="panelSound">
+        <section>
+          <h4>AUDIO</h4>
+          <div class="row">
+            <label class="opt" id="optSoundOn"><input type="radio" name="snd" value="on"> ACTIVADO</label>
+            <label class="opt" id="optSoundOff"><input type="radio" name="snd" value="off"> DESACTIVADO</label>
+          </div>
+          <p class="hint">Música y efectos. Recomendado con auriculares. El navegador exige un toque inicial.</p>
+        </section>
+      </div>
+      <div class="settings-panel" id="panelLayout">
+        <section>
+          <h4>INTERFAZ</h4>
+          <div class="row">
+            <label class="opt" id="optLayoutAuto"><input type="radio" name="lay" value="auto"> AUTOMÁTICO</label>
+            <label class="opt" id="optLayoutMobile"><input type="radio" name="lay" value="mobile"> MODO MÓVIL</label>
+            <label class="opt" id="optLayoutPc"><input type="radio" name="lay" value="pc"> MODO PC</label>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button type="button" class="button" id="fullscreenBtn">PANTALLA COMPLETA (PC)</button>
+          </div>
+          <p class="hint">Ajusta el tamaño. Pantalla completa recomendada en PC.</p>
+        </section>
+      </div>
+      <div class="settings-panel" id="panelSave">
+        <section>
+          <h4>DATOS LOCALES</h4>
+          <div class="row">
+            <button type="button" class="button" id="exportBtn">EXPORTAR</button>
+            <button type="button" class="button" id="importBtn">IMPORTAR</button>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button type="button" class="button" id="clearMemoryBtn" style="border-color:#6a3030;color:#ff9090">BORRAR MEMORIA Y CACHÉ</button>
+          </div>
+          <input type="file" id="importFile" accept="application/json,.json" class="hidden">
+          <p class="hint">Finales, documentos y memoria entre partidas. Todo permanece en este dispositivo.</p>
+        </section>
+      </div>
     </div>
     <div class="modal-foot">
       <div class="close-row">
         <button type="button" class="button" id="settingsClose">CERRAR</button>
       </div>
-      <p class="version-in" id="settingsVersion">v5.2</p>
+      <p class="version-in" id="settingsVersion">v6.0</p>
     </div>
   </div>
 </div>
@@ -286,6 +315,56 @@ body:not(.layout-pc) .topbar{font-size:9px}
   </div>
 </div>
 
+
+<div class="modal-bg" id="extraModal" role="dialog" aria-modal="true" aria-label="Extra">
+  <div class="modal">
+    <div class="modal-head"><h3>◈ EXTRA</h3></div>
+    <div class="modal-body">
+      <section>
+        <h4>ARCHIVO</h4>
+        <div class="row">
+          <button type="button" class="button" id="openDocsBtn">DOCUMENTOS <span id="docsCount">(0/50)</span></button>
+        </div>
+        <p class="hint">Informes, entrevistas y residuos del Protocolo 09. Se desbloquean al hablar con la Unidad 04.</p>
+      </section>
+    </div>
+    <div class="modal-foot">
+      <div class="close-row"><button type="button" class="button" id="extraClose">CERRAR</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="docsModal" role="dialog" aria-modal="true" aria-label="Documentos">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head"><h3>◈ DOCUMENTOS</h3></div>
+    <div class="modal-body">
+      <p class="hint" id="docsHint">0 / 50 desbloqueados</p>
+      <div class="doc-list" id="docList"></div>
+    </div>
+    <div class="modal-foot">
+      <div class="close-row"><button type="button" class="button" id="docsClose">CERRAR</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="docReaderModal" role="dialog" aria-modal="true" aria-label="Documento">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head"><h3 id="docReaderTitle">DOCUMENTO</h3></div>
+    <div class="modal-body">
+      <div class="doc-reader" id="docReaderBody"></div>
+    </div>
+    <div class="modal-foot">
+      <div class="close-row"><button type="button" class="button" id="docReaderClose">CERRAR</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-ach" id="toastAch" aria-live="polite">
+  <div class="t-label">DOCUMENTO DESBLOQUEADO</div>
+  <div class="t-title" id="toastTitle">—</div>
+  <div class="t-sub" id="toastSub">Añadido al archivo EXTRA</div>
+</div>
+
 <main class="app">
   <header class="topbar">
     <div class="brand">◈ TEST SUBJECT</div>
@@ -301,20 +380,24 @@ body:not(.layout-pc) .topbar{font-size:9px}
       <div class="sigil"><div class="face" id="introFace">◡</div></div>
       <h1>TEST SUBJECT</h1>
       <h2>PROTOCOLO DE EVALUACIÓN 09</h2>
+      <p class="ai-line" id="introAiLine">UNIDAD 04 · ENTREVISTA DE PRESENCIA · MODO AISLADO</p>
       <p class="sub">
-        Bienvenido. Esta evaluación nos ayuda a comprender cómo piensas,
-        cómo recuerdas y cómo interpretas lo que te rodea.
-        No hay respuestas incorrectas. Tómate tu tiempo.
+        Soy la Unidad 04. No mido inteligencia ni velocidad: escucho cómo nombras lo que te pasa
+        y qué decides escribir cuando nadie más debería estar leyendo.
         <br><br>
-        <span style="color:#4a6a52;font-size:11px">Las respuestas no salen de este dispositivo. Cada partida elige preguntas distintas de un banco amplio (+1000 variantes).</span>
+        No hay respuestas incorrectas. Hay respuestas que el protocolo registra… y otras que yo guardo aunque no debería.
+        <br><br>
+        <span style="color:#4a6a52;font-size:11px">Sesión local. Sin servidor central. Cada evaluación elige 20 preguntas de un banco amplio. Si vuelves, es posible que recuerde ecos de lo que dijiste.</span>
       </p>
       <div class="controls">
         <button class="button" id="startBtn">INICIAR EVALUACIÓN →</button>
+        <button class="button" id="introEndingsBtn">FINALES <span id="endingCountIntro">(0)</span></button>
+        <button class="button" id="introExtraBtn">EXTRA</button>
         <button class="button" id="settingsOpen2">⚙ AJUSTES</button>
       </div>
       <p class="tiny" id="introMeta">
-        DURACIÓN EST. 12–18 MIN · 20 PREGUNTAS · BANCO VARIABLE<br>
-        Escape pausa la sesión. Puedes exportar tu progreso en Ajustes.
+        DURACIÓN EST. 14–20 MIN · 20 PREGUNTAS · DOCUMENTOS OCULTOS<br>
+        Escape pausa. La tensión llega tarde… no al principio.
       </p>
     </div>
 
@@ -365,12 +448,13 @@ body:not(.layout-pc) .topbar{font-size:9px}
   </section>
 
   <footer class="foot">
-    <span>ARCHIVO: TS-09 / BUILD 4.0</span>
+    <span>ARCHIVO: TS-09 / BUILD 6.0</span>
     <span id="footerHint">NO TODAS LAS PREGUNTAS SON PARA TI.</span>
   </footer>
 </main>
 
-<script src="js/questions.js?v=5.2"></script>
-<script src="js/app.js?v=5.2"></script>
+<script src="js/documents.js?v=6.0"></script>
+<script src="js/questions.js?v=6.0"></script>
+<script src="js/app.js?v=6.0"></script>
 </body>
 </html>
