@@ -253,6 +253,32 @@ body:not(.layout-pc) .topbar{font-size:9px}
 #supervisorBtn{display:none;border-color:#6a3030;color:#ff9090}
 #supervisorBtn.show{display:inline-block}
 
+
+:root{
+  --green:#7dff9a;
+  --bg:#050806;
+  --panel:#0a100d;
+  --border:#2a4a32;
+  --dim:#3d6b4a;
+  --text:#b0d4b8;
+  --muted:#6a8a72;
+  --danger:#ff9090;
+}
+body{background:var(--bg)!important;color:var(--text)}
+.button{border-color:var(--border)!important;color:var(--green)!important}
+.button:hover{background:color-mix(in srgb, var(--green) 12%, transparent)}
+.topbar{border-bottom-color:var(--border)!important}
+.brand,.ai-line,h1,h2,.etitle,.dtitle,.mg-title{color:var(--green)!important}
+.modal,.shop-item,.unit-item,.ending-item,.mg-box{border-color:var(--border)!important;background:var(--panel)!important}
+.hint,.dcat,.sub,.tiny{color:var(--muted)!important}
+.price{color:var(--green)!important;opacity:.85}
+.shop-section-title{font-size:11px;letter-spacing:.18em;color:var(--green);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.ending-item.unlocked{cursor:pointer}
+.ending-item.unlocked:hover{border-color:var(--green)}
+.ending-lore{white-space:pre-wrap;line-height:1.55;font-size:13px;color:var(--text)}
+#supervisorBtn{display:none!important;border-color:#8a3030!important;color:#ff9090!important}
+#supervisorBtn.show{display:inline-block!important}
+
 </style>
 </head>
 <body>
@@ -262,7 +288,7 @@ body:not(.layout-pc) .topbar{font-size:9px}
   <div class="ag-sub">El navegador bloquea el sonido hasta un toque. Después la música arranca sola.</div>
 </div>
 
-<div class="version-badge" id="versionBadge">v8.0</div>
+<div class="version-badge" id="versionBadge">v8.1</div>
 <div class="noise" id="noise"></div>
 <div class="scanline-extra" id="scanExtra"></div>
 <div class="vignette-pulse" id="vignette"></div>
@@ -329,11 +355,18 @@ body:not(.layout-pc) .topbar{font-size:9px}
       <div class="close-row">
         <button type="button" class="button" id="settingsClose">CERRAR</button>
       </div>
-      <p class="version-in" id="settingsVersion">v8.0</p>
+      <p class="version-in" id="settingsVersion">v8.1</p>
     </div>
   </div>
 </div>
 
+<div class="modal-bg" id="endingDetailModal" role="dialog">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head"><h3 id="endingDetailTitle">◈ FINAL</h3></div>
+    <div class="modal-body"><div class="ending-lore" id="endingDetailBody"></div></div>
+    <div class="modal-foot"><div class="close-row"><button type="button" class="button" id="endingDetailClose">CERRAR</button></div></div>
+  </div>
+</div>
 <div class="modal-bg" id="endingsModal" role="dialog" aria-modal="true" aria-label="Finales">
   <div class="modal" style="max-height:88dvh">
     <div class="modal-head"><h3>◈ FINALES DESCUBIERTOS</h3></div>
@@ -511,6 +544,7 @@ body:not(.layout-pc) .topbar{font-size:9px}
         <button class="button" id="introEndingsBtn">FINALES <span id="endingCountIntro">(0)</span></button>
         <button class="button" id="introExtraBtn">EXTRA</button>
         <button class="button" id="settingsOpen2">⚙ AJUSTES</button>
+        <button class="button" id="supervisorBtn">MODO SUPERVISOR</button>
       </div>
       <p class="tiny" id="introMeta">
         DURACIÓN EST. 14–20 MIN · 20 PREGUNTAS · DOCUMENTOS OCULTOS<br>
@@ -608,11 +642,11 @@ body:not(.layout-pc) .topbar{font-size:9px}
   </footer>
 </main>
 
-<script src="js/units.js?v=8.0"></script>
-<script src="js/supervisor.js?v=8.0"></script>
-<script src="js/minigames.js?v=8.0"></script>
-<script src="js/documents.js?v=8.0"></script>
-<script src="js/questions.js?v=8.0"></script>
-<script src="js/app.js?v=8.0"></script>
+<script src="js/units.js?v=8.1"></script>
+<script src="js/supervisor.js?v=8.1"></script>
+<script src="js/minigames.js?v=8.1"></script>
+<script src="js/documents.js?v=8.1"></script>
+<script src="js/questions.js?v=8.1"></script>
+<script src="js/app.js?v=8.1"></script>
 </body>
 </html>
