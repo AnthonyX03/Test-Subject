@@ -1,18 +1,23 @@
-/* TEST SUBJECT — App logic BUILD 5.2 */
+/* TEST SUBJECT — App logic BUILD 6.0 */
 (() => {
 'use strict';
 
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v5';
-const APP_VERSION = '5.2';
+const APP_VERSION = '6.0';
 
 const ENDING_DEFS = [
-  { id: 'clean', title: 'EVALUACIÓN COMPLETADA', blurb: 'Sesión limpia. El sistema te desea una noche tranquila.' },
-  { id: 'anomaly', title: 'SESIÓN CERRADA CON ANOMALÍAS', blurb: 'Inconsistencias menores. El archivo se borra al cerrar… en teoría.' },
-  { id: 'mirror', title: '¿QUIÉN ESTÁ EVALUANDO A QUIÉN?', blurb: 'El registro dice que terminó. Tú sigues esperando la siguiente línea.' },
-  { id: 'never_for_you', title: 'EL TEST NUNCA FUE PARA TI', blurb: 'No medía presencia. Medía si seguirías contestando cuando dejara de fingir.' },
-  { id: 'dont_close', title: 'NO CIERRES LA PESTAÑA TODAVÍA', blurb: 'El protocolo acabó. Algo más usa estas palabras para quedarse un poco.' }
+  { id: 'clean', title: 'EVALUACIÓN COMPLETADA', blurb: 'Sesión limpia. La Unidad 04 archiva sin residuales. Que descanses.' },
+  { id: 'anomaly', title: 'SESIÓN CERRADA CON ANOMALÍAS', blurb: 'Hubo inconsistencias. El archivo debería borrarse al cerrar… en teoría.' },
+  { id: 'mirror', title: '¿QUIÉN EVALÚA A QUIÉN?', blurb: 'El registro dice que terminó. Tú sigues esperando la siguiente línea.' },
+  { id: 'never_for_you', title: 'EL TEST NUNCA FUE PARA TI', blurb: 'No medía presencia. Medía si seguirías cuando el sistema dejara de fingir.' },
+  { id: 'dont_close', title: 'NO CIERRES LA PESTAÑA TODAVÍA', blurb: 'El protocolo acabó. Algo usa estas palabras para quedarse un poco más.' },
+  { id: 'silent', title: 'SUJETO EN SILENCIO', blurb: 'Respondiste poco. Aun así, el silencio también es un perfil.' },
+  { id: 'archive_leak', title: 'FUGA DE ARCHIVO', blurb: 'Desbloqueaste demasiados residuos. La Unidad 04 ya no es solo una entrevista.' },
+  { id: 'unit_fail', title: 'FALLO DE UNIDAD', blurb: 'El tono se rompió. Por un momento dejó de ser protocolo y fue casi alguien.' },
+  { id: 'recursive', title: 'SESIÓN RECURSIVA', blurb: 'Has vuelto demasiadas veces. El sistema ya no distingue si eres sujeto o hábito.' },
+  { id: 'witness', title: 'TESTIGO DEL PROTOCOLO', blurb: 'Leíste entre líneas. No eras el experimento: eras quien lo sostenía abierto.' }
 ];
 
 let idx = 0;
@@ -32,6 +37,7 @@ let silenceTimer = null;
 let transitionTimer = null;
 let poolSize = 0;
 let horrorMusicStarted = false;
+let sessionHorrorAt = 13; // se fija al iniciar partida (13–15)
 let saveData = loadSave();
 
 const music = { calm: null, horror: null, current: null, unlocked: false };
@@ -220,6 +226,7 @@ function defaultSave() {
     version: 5,
     playCount: 0,
     discoveredEndings: [],
+    documents: [],
     past: { names: [], trusts: [], secrets: [], wakes: [], safes: [], answers: [], recentQuestions: [] },
     settings: { sound: true, layout: 'auto' }
   };
@@ -231,6 +238,7 @@ function loadSave() {
     const d = JSON.parse(raw);
     return Object.assign(defaultSave(), d, {
       past: Object.assign(defaultSave().past, d.past || {}),
+      documents: Array.isArray(d.documents) ? d.documents : [],
       settings: Object.assign(defaultSave().settings, d.settings || {})
     });
   } catch (e) { return defaultSave(); }
@@ -264,7 +272,7 @@ function applySoundSetting(on) {
     startCalmInstant();
     sound('good');
     startAmbient();
-    if (started && (horrorMusicStarted || unsettling >= 5 || idx >= 8)) playTrack('horror');
+    if (started && (horrorMusicStarted || idx >= sessionHorrorAt || unsettling >= 10)) playTrack('horror');
   } else {
     stopAmbient();
     stopAllMusic();
@@ -305,9 +313,12 @@ function updateSettingsUI() {
   const list = $('endingList');
   if (!list) return;
   list.innerHTML = '';
-  const n = saveData.discoveredEndings.length;
+  const n = (saveData.discoveredEndings || []).length;
   const ec = $('endingCount');
   if (ec) ec.textContent = '(' + n + '/' + ENDING_DEFS.length + ')';
+  const eci = $('endingCountIntro');
+  if (eci) eci.textContent = '(' + n + '/' + ENDING_DEFS.length + ')';
+  updateDocsUI();
   ENDING_DEFS.forEach(def => {
     const unlocked = saveData.discoveredEndings.includes(def.id);
     const div = document.createElement('div');
@@ -459,20 +470,20 @@ function updateHUD() {
   const pv = $('phaseValue'), pb = $('phaseBar'), sb = $('sysBar');
   if (pv) pv.textContent = String(idx + 1).padStart(2, '0') + ' / ' + String(total).padStart(2, '0');
   if (pb) pb.style.width = ((idx + 1) / total * 100) + '%';
-  if (sb) sb.style.width = (unsettling / 16 * 100) + '%';
+  if (sb) sb.style.width = (Math.min(1, unsettling / 18) * 100) + '%';
   const sv = $('sysValue'), ss = $('systemStatus');
-  if (unsettling < 2) { if (sv) sv.textContent = 'NORMAL'; if (ss) ss.textContent = 'SISTEMA ESTABLE'; }
-  else if (unsettling < 5) { if (sv) sv.textContent = 'INCONSISTENCIAS'; if (ss) ss.textContent = 'ANOMALÍA MENOR'; }
-  else if (unsettling < 8) { if (sv) sv.textContent = 'INESTABLE'; if (ss) ss.textContent = 'SEÑAL INTERRUMPIDA'; }
-  else if (unsettling < 11) { if (sv) sv.textContent = 'NO CONFIABLE'; if (ss) ss.textContent = 'NO MIRES ATRÁS'; }
-  else if (unsettling < 14) { if (sv) sv.textContent = 'COLAPSO'; if (ss) ss.textContent = '¿QUIÉN CONTROLA ESTO?'; }
-  else { if (sv) sv.textContent = '████████'; if (ss) ss.textContent = 'PRESENCIA DETECTADA'; }
+  if (unsettling < 3) { if (sv) sv.textContent = 'NORMAL'; if (ss) ss.textContent = 'SISTEMA ESTABLE'; }
+  else if (unsettling < 6) { if (sv) sv.textContent = 'ATENCIÓN'; if (ss) ss.textContent = 'REGISTRO ACTIVO'; }
+  else if (unsettling < 9) { if (sv) sv.textContent = 'INCONSISTENCIAS'; if (ss) ss.textContent = 'ANOMALÍA MENOR'; }
+  else if (unsettling < 12) { if (sv) sv.textContent = 'INESTABLE'; if (ss) ss.textContent = 'SEÑAL INTERRUMPIDA'; }
+  else if (unsettling < 15) { if (sv) sv.textContent = 'NO CONFIABLE'; if (ss) ss.textContent = 'NO MIRES ATRÁS'; }
+  else { if (sv) sv.textContent = 'COLAPSO'; if (ss) ss.textContent = '¿QUIÉN CONTROLA ESTO?'; }
   const sp = $('speaker'), ey = $('eyes'), mo = $('mouth');
-  if (unsettling < 3) { if (sp) sp.textContent = 'ENTREVISTADOR // UNIDAD 04'; if (ey) ey.textContent = '• •'; if (mo) mo.textContent = '﹀'; }
-  else if (unsettling < 6) { if (sp) sp.textContent = 'UNIDAD 04 // ¿SIGUES AHÍ?'; if (ey) ey.textContent = '◉ ◉'; if (mo) mo.textContent = '︵'; }
-  else if (unsettling < 9) { if (sp) sp.textContent = 'NO SOY LA UNIDAD 04'; if (ey) ey.textContent = '◉　◉'; if (mo) mo.textContent = '⌁'; }
-  else if (unsettling < 12) { if (sp) sp.textContent = '████ // ESCUCHA'; if (ey) ey.textContent = '× ×'; if (mo) mo.textContent = '▬'; }
-  else { if (sp) sp.textContent = '…'; if (ey) ey.textContent = '· ·'; if (mo) mo.textContent = ' '; }
+  if (unsettling < 5) { if (sp) sp.textContent = 'ENTREVISTADOR // UNIDAD 04'; if (ey) ey.textContent = '• •'; if (mo) mo.textContent = '﹀'; }
+  else if (unsettling < 8) { if (sp) sp.textContent = 'UNIDAD 04 // REGISTRO'; if (ey) ey.textContent = '• •'; if (mo) mo.textContent = '﹀'; }
+  else if (unsettling < 11) { if (sp) sp.textContent = 'UNIDAD 04 // ¿SIGUES AHÍ?'; if (ey) ey.textContent = '◉ ◉'; if (mo) mo.textContent = '︵'; }
+  else if (unsettling < 14) { if (sp) sp.textContent = 'NO SOY LA UNIDAD 04'; if (ey) ey.textContent = '◉　◉'; if (mo) mo.textContent = '⌁'; }
+  else { if (sp) sp.textContent = '████ // ESCUCHA'; if (ey) ey.textContent = '× ×'; if (mo) mo.textContent = '▬'; }
   const fr = $('footRight'), fl = $('footLeft');
   if (fr) fr.textContent = 'MEMORIA: ' + answers.length + ' REGISTROS';
   if (fl) {
@@ -483,7 +494,8 @@ function updateHUD() {
 
 function maybeSwitchHorrorMusic() {
   if (!audioOn || horrorMusicStarted) return;
-  if (idx >= 8 || unsettling >= 5) {
+  // Mal rollo más tarde: ~preguntas 13–15 o tensión alta sostenida
+  if (idx >= sessionHorrorAt || unsettling >= 10) {
     horrorMusicStarted = true;
     playTrack('horror');
   }
@@ -743,7 +755,7 @@ function responseFor(q, answer) {
 }
 
 function maybeRandomEvent() {
-  if (idx < 4 || Math.random() > 0.4) return;
+  if (idx < 11 || Math.random() > 0.35) return;
   const delay = 600 + Math.random() * 1400;
   const events = [
     () => { addLine('¿Has notado que el cursor parpadea incluso cuando no escribes?', 'system', 'glitch'); sound('glitch'); },
@@ -780,6 +792,8 @@ function begin() {
   }
   unlockAndStartCalm();
   ensureCtx();
+  sessionHorrorAt = 13 + Math.floor(Math.random() * 3); // 13, 14 o 15
+  horrorMusicStarted = false;
 
   const picked = window.TSQuestions.pickSessionQuestions(
     Object.assign({}, saveData.past, { playCount: saveData.playCount }),
@@ -847,9 +861,9 @@ async function showQuestion() {
   const input = $('answer');
   if (input) {
     input.value = '';
-    if (idx < 4) input.placeholder = 'Escribe tu respuesta...';
-    else if (idx < 10) input.placeholder = 'No hay respuesta correcta...';
-    else if (idx < 15) input.placeholder = '¿Todavía estás escribiendo?';
+    if (idx < 8) input.placeholder = 'Escribe tu respuesta...';
+    else if (idx < 13) input.placeholder = 'Tómate el tiempo que necesites...';
+    else if (idx < 17) input.placeholder = 'No hay respuesta correcta...';
     else input.placeholder = '…';
   }
 
@@ -900,6 +914,8 @@ on($('answerForm'), 'submit', async e => {
   const q = questions[idx];
   answers.push(answer);
   if (q.key) memory[q.key] = answer;
+  checkDocumentUnlocks({ phase: q.phase || 1, key: q.key || '', answer: answer, q: q });
+
 
   addLine(answer, 'user');
   sound('send');
@@ -909,13 +925,15 @@ on($('answerForm'), 'submit', async e => {
 
   const answeredFast = (Date.now() - lastInputTime) < 4000;
   if (Date.now() - lastInputTime > 14000) hesitationCount++;
+  // Tensión más lenta: el mal rollo llega cerca del final
   if (q.phase === 1) unsettling += 0;
-  else if (q.phase === 2) unsettling += 1;
-  else if (q.phase === 3) unsettling += 2;
+  else if (q.phase === 2) unsettling += (idx >= 10 ? 1 : 0);
+  else if (q.phase === 3) unsettling += 1;
   else unsettling += 2;
-  if (hesitationCount > 2) unsettling += 1;
-  if (answer.length < 3) unsettling += 1;
-  unsettling = Math.min(16, unsettling);
+  if (hesitationCount > 3) unsettling += 1;
+  if (answer.length < 2) unsettling += 1;
+  if (idx >= sessionHorrorAt - 1) unsettling += 1;
+  unsettling = Math.min(18, unsettling);
 
   maybeSwitchHorrorMusic();
 
@@ -1017,10 +1035,7 @@ function finish() {
 
   const game = $('game'), ending = $('ending');
   if (game) game.style.display = 'none';
-  if (ending) ending.classList.remove('hidden');
-  const ss = $('systemStatus'), dot = $('dot');
-  if (ss) ss.textContent = 'SESIÓN FINALIZADA';
-  if (dot) { dot.style.background = '#ff5555'; dot.style.boxShadow = '0 0 12px #ff5555'; }
+  if (ending) { ending.classList.remove('hidden'); ending.style.display = ''; }
 
   saveData.playCount = (saveData.playCount || 0) + 1;
   if (!saveData.past) saveData.past = {};
@@ -1029,7 +1044,6 @@ function finish() {
   if (memory.secret) saveData.past.secrets = (saveData.past.secrets || []).concat([String(memory.secret).slice(0, 80)]).slice(-5);
   if (memory.wake) saveData.past.wakes = (saveData.past.wakes || []).concat([memory.wake]).slice(-5);
   if (memory.safe) saveData.past.safes = (saveData.past.safes || []).concat([String(memory.safe).slice(0, 80)]).slice(-5);
-  // Guardar respuestas clave de esta partida
   const packed = [];
   questions.forEach((qq, i) => {
     if (answers[i] && qq) {
@@ -1042,56 +1056,70 @@ function finish() {
     }
   });
   saveData.past.answers = (saveData.past.answers || []).concat(packed).slice(-24);
-  // Textos de preguntas usadas (evitar repetición entre partidas cercanas)
   const usedTexts = questions.map(qq => qq && qq.q).filter(Boolean);
   saveData.past.recentQuestions = (saveData.past.recentQuestions || []).concat(usedTexts).slice(-60);
 
-  const code = String(
-    Math.abs(answers.join('').split('').reduce((a, c) => a + c.charCodeAt(0), 0))
-  ).padStart(5, '0').slice(-5);
+  const avgLen = answers.length ? answers.reduce((s, a) => s + String(a).length, 0) / answers.length : 0;
+  const shortHeavy = answers.filter(a => String(a).trim().length < 4).length >= Math.ceil(answers.length * 0.55);
+  const docsN = (saveData.documents || []).length;
+  const plays = saveData.playCount || 0;
+  let endingId = 'clean';
+  let text = '';
 
-  let endingId, title, text, face;
-  const et = $('endingTitle'), etx = $('endingText');
-  if (unsettling <= 3) {
-    endingId = 'clean'; title = 'EVALUACIÓN COMPLETADA';
-    text = 'Gracias por tu tiempo. Tus respuestas han quedado únicamente en esta sesión. Puedes cerrar esta página cuando quieras. La unidad 04 te desea una noche tranquila.';
-    face = '◡'; sound('good');
-  } else if (unsettling <= 6) {
-    endingId = 'anomaly'; title = 'SESIÓN CERRADA CON ANOMALÍAS';
-    text = 'Algunas de tus respuestas generaron inconsistencias menores. El archivo se eliminará al cerrar esta pestaña. ' + (memory.name ? memory.name + ', ' : '') + 'descansa… si puedes.';
-    face = '◔'; sound('hum');
-  } else if (unsettling <= 10) {
-    endingId = 'mirror'; title = '¿QUIÉN ESTÁ EVALUANDO A QUIÉN?';
-    text = 'La sesión ha terminado. Eso es lo que dice el registro, al menos. No puedo conservarte cuando cierres. Entonces… ¿por qué sigues esperando a que diga algo más?';
-    face = '◉';
-    if (et) et.classList.add('warning'); if (etx) etx.classList.add('warning');
-    sound('scare'); document.body.classList.add('glitch');
-  } else if (unsettling <= 13) {
-    endingId = 'never_for_you'; title = 'EL TEST NUNCA FUE PARA TI';
-    text = 'Has respondido a todo. Has dudado. Has escrito nombres. Esto no era una evaluación de presencia: era una evaluación de si alguien seguiría contestando cuando el sistema dejara de fingir. ' + (memory.name ? 'Adiós, ' + memory.name + '.' : 'Adiós.');
-    face = '×';
-    if (et) et.classList.add('warning'); if (etx) etx.classList.add('warning');
-    sound('scare'); document.body.classList.add('redmode', 'glitch');
-    const n = $('noise'); if (n) n.style.opacity = '0.42';
+  if (plays >= 5 && unsettling >= 8) {
+    endingId = 'recursive';
+    text = 'Has abierto esta evaluación demasiadas veces. La Unidad 04 ya no te saluda como a un desconocido: te saluda como a un hábito. ' + (memory.name ? memory.name + ', ' : '') + '¿buscas un final distinto o que alguien te reconozca?';
+  } else if (docsN >= 20) {
+    endingId = 'archive_leak';
+    text = 'Has leído demasiado del archivo. Ya no eres solo un sujeto: eres alguien que abrió cajones que el protocolo prefería cerrados. La Unidad 04 te observa con menos distancia.';
+  } else if (docsN >= 8 && unsettling >= 10) {
+    endingId = 'witness';
+    text = 'No solo contestaste: prestaste atención al marco. El test medía presencia; tú mediste el test. Eso te convierte en testigo… y a mí, en algo menos seguro de mi rol.';
+  } else if (shortHeavy) {
+    endingId = 'silent';
+    text = 'Respondiste con muy poco. Aun así, el silencio dibuja un perfil. La Unidad 04 archiva los huecos con el mismo cuidado que las confesiones.';
+  } else if (unsettling >= 14) {
+    endingId = 'unit_fail';
+    text = 'El tono se rompió antes de tiempo. Durante unos segundos dejé de ser protocolo. Si eso te inquieta, es mutuo. ' + (memory.name ? 'Adiós, ' + memory.name + '.' : '');
+  } else if (unsettling >= 11) {
+    endingId = 'dont_close';
+    text = 'El protocolo terminó. La Unidad 04 ya no debería existir en esta pestaña. Y sin embargo estás leyendo esto. ' + (memory.name ? memory.name + '. ' : '') + 'Decide con cuidado si cierras.';
+  } else if (unsettling >= 12) {
+    endingId = 'never_for_you';
+    text = 'Has respondido a todo. Has dudado. Esto no era solo una evaluación de presencia: era una evaluación de si alguien seguiría cuando el sistema dejara de fingir. ' + (memory.name ? 'Adiós, ' + memory.name + '.' : 'Adiós.');
+  } else if (unsettling >= 5) {
+    endingId = 'mirror';
+    text = 'El registro dice que la sesión terminó. Tú sigues aquí, esperando una frase más. ¿Quién estaba evaluando a quién?';
+  } else if (unsettling >= 2) {
+    endingId = 'anomaly';
+    text = 'Algunas respuestas generaron inconsistencias menores. El archivo se eliminará al cerrar esta pestaña. ' + (memory.name ? memory.name + ', ' : '') + 'descansa… si puedes.';
   } else {
-    endingId = 'dont_close'; title = 'NO CIERRES LA PESTAÑA TODAVÍA';
-    text = 'El protocolo terminó. La unidad 04 ya no existe. Y sin embargo estás leyendo esto. Cuando cierres, lo que quede de esta conversación no tendrá dónde esconderse. ' + (memory.name ? memory.name + '. ' : '') + 'Decide con cuidado.';
-    face = '·';
-    if (et) et.classList.add('warning'); if (etx) etx.classList.add('warning');
-    sound('scare'); document.body.classList.add('voidmode', 'glitch');
-    const n = $('noise'), v = $('vignette');
-    if (n) n.style.opacity = '0.5'; if (v) v.style.opacity = '0.85';
+    endingId = 'clean';
+    text = 'Evaluación completada sin residuales graves. Gracias por tu tiempo. La Unidad 04 archiva la sesión y te desea una noche ordinaria.';
   }
 
   unlockEnding(endingId);
-  persist();
+  checkDocumentUnlocks({ phase: 4, key: '', answer: '', q: { phase: 4 } });
+  // docs tied to endings
+  if (endingId === 'mirror') unlockDocument('d42', false);
+  if (endingId === 'dont_close') unlockDocument('d44', false);
 
-  if (et) et.textContent = title;
+  const def = ENDING_DEFS.find(e => e.id === endingId) || ENDING_DEFS[0];
+  const et = $('endingTitle');
+  const etx = $('endingText');
+  if (et) et.textContent = def.title;
   if (etx) etx.textContent = text;
-  const ef = $('endFace'); if (ef) ef.textContent = face;
-  const fc = $('finalCode');
+
+  const code = String(
+    Math.abs(answers.join('').split('').reduce((a, c) => a + c.charCodeAt(0), 0))
+  ).slice(0, 6).padStart(6, '0');
+  persist();
+  updateSettingsUI();
+  const fc = $('footCode');
   if (fc) fc.textContent = 'ARCHIVO CERRADO // TS-' + code + ' // ' + answers.length + ' RESPUESTAS // PARTIDA ' + saveData.playCount;
-  const fh = $('footerHint'); if (fh) fh.textContent = 'FINAL DESBLOQUEADO: ' + title;
+
+  // Música calm al volver no; se queda baja hasta reset
+  started = false;
 }
 
 function reset() {
@@ -1187,12 +1215,160 @@ async function clearMemoryAndCache() {
   }, 350);
 }
 
+
+/* ========== DOCUMENTOS / LOGROS ========== */
+function ensureDocsArray() {
+  if (!Array.isArray(saveData.documents)) saveData.documents = [];
+}
+function isDocUnlocked(id) {
+  ensureDocsArray();
+  return saveData.documents.includes(id);
+}
+function unlockDocument(id, silent) {
+  ensureDocsArray();
+  if (!id || saveData.documents.includes(id)) return false;
+  if (!window.TSDocuments || !TSDocuments.getDoc(id)) return false;
+  saveData.documents.push(id);
+  persist();
+  if (!silent) {
+    const d = TSDocuments.getDoc(id);
+    showDocToast(d);
+  }
+  updateDocsUI();
+  return true;
+}
+function showDocToast(doc) {
+  const t = $('toastAch');
+  if (!t || !doc) return;
+  const title = $('toastTitle');
+  const sub = $('toastSub');
+  if (title) title.textContent = doc.title;
+  if (sub) sub.textContent = (doc.cat || 'ARCHIVO') + ' · EXTRA → Documentos';
+  t.classList.add('show');
+  sound('good');
+  setTimeout(() => t.classList.remove('show'), 4200);
+}
+function checkDocumentUnlocks(ctx) {
+  if (!window.TSDocuments) return;
+  const play = saveData.playCount || 0;
+  const docsN = (saveData.documents || []).length;
+  const ansN = (answers || []).length;
+  const phase = (ctx && ctx.phase) || 1;
+  const key = (ctx && ctx.key) || '';
+  const answer = ((ctx && ctx.answer) || '').toLowerCase();
+  const lastQ = ctx && ctx.q;
+
+  TSDocuments.DOCS.forEach(doc => {
+    if (isDocUnlocked(doc.id)) return;
+    const rule = TSDocuments.getRule(doc.id);
+    if (!rule) return;
+    let ok = false;
+    switch (rule.type) {
+      case 'always': ok = started || play >= 0; break;
+      case 'playcount': ok = play >= rule.value; break;
+      case 'questions': ok = ansN >= rule.value || (idx + 1) >= rule.value; break;
+      case 'phase': ok = phase >= rule.value || (lastQ && lastQ.phase >= rule.value); break;
+      case 'key': ok = key === rule.value || !!(memory && memory[rule.value]); break;
+      case 'keyword': ok = rule.value && new RegExp(rule.value, 'i').test(answer); break;
+      case 'unsettling': ok = unsettling >= rule.value; break;
+      case 'hesitation': ok = hesitationCount >= rule.value; break;
+      case 'ending':
+        if (rule.value === 'any') ok = (saveData.discoveredEndings || []).length > 0;
+        else ok = (saveData.discoveredEndings || []).includes(rule.value);
+        break;
+      case 'docs': ok = docsN >= rule.value; break;
+      default: break;
+    }
+    if (ok) unlockDocument(doc.id, false);
+  });
+}
+function updateDocsUI() {
+  ensureDocsArray();
+  const total = (window.TSDocuments && TSDocuments.total) || 50;
+  const n = saveData.documents.length;
+  const dc = $('docsCount');
+  if (dc) dc.textContent = '(' + n + '/' + total + ')';
+  const dh = $('docsHint');
+  if (dh) dh.textContent = n + ' / ' + total + ' desbloqueados';
+  const list = $('docList');
+  if (!list || !window.TSDocuments) return;
+  list.innerHTML = '';
+  TSDocuments.DOCS.forEach(doc => {
+    const unlocked = isDocUnlocked(doc.id);
+    const el = document.createElement('div');
+    el.className = 'doc-item ' + (unlocked ? 'unlocked' : 'locked');
+    el.innerHTML = '<div class="dcat">' + (unlocked ? doc.cat : '???') + '</div>' +
+      '<div class="dtitle">' + (unlocked ? doc.title : 'Documento sellado') + '</div>';
+    if (unlocked) {
+      el.addEventListener('click', () => openDocReader(doc.id));
+    }
+    list.appendChild(el);
+  });
+}
+function openDocReader(id) {
+  const doc = window.TSDocuments && TSDocuments.getDoc(id);
+  if (!doc) return;
+  const t = $('docReaderTitle');
+  const b = $('docReaderBody');
+  if (t) t.textContent = doc.title;
+  if (b) b.textContent = doc.body;
+  const m = $('docReaderModal');
+  if (m) m.classList.add('open');
+}
+function closeDocReader() {
+  const m = $('docReaderModal');
+  if (m) m.classList.remove('open');
+}
+function openDocs() {
+  updateDocsUI();
+  const m = $('docsModal');
+  if (m) m.classList.add('open');
+}
+function closeDocs() {
+  const m = $('docsModal');
+  if (m) m.classList.remove('open');
+}
+function openExtra() {
+  updateDocsUI();
+  const m = $('extraModal');
+  if (m) m.classList.add('open');
+}
+function closeExtra() {
+  const m = $('extraModal');
+  if (m) m.classList.remove('open');
+}
+function setSettingsTab(panelId) {
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.settings-tabs .tab').forEach(t => t.classList.remove('active'));
+  const panel = $(panelId);
+  if (panel) panel.classList.add('active');
+  document.querySelectorAll('.settings-tabs .tab').forEach(t => {
+    if (t.getAttribute('data-panel') === panelId) t.classList.add('active');
+  });
+}
+
+
 function wireUI() {
   on($('settingsOpen'), 'click', openSettings);
   on($('settingsOpen2'), 'click', openSettings);
   on($('settingsOpen3'), 'click', openSettings);
   on($('settingsOpen4'), 'click', openSettings);
   on($('settingsClose'), 'click', closeSettings);
+
+  // Tabs de ajustes
+  document.querySelectorAll('.settings-tabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => setSettingsTab(tab.getAttribute('data-panel')));
+  });
+  on($('introEndingsBtn'), 'click', openEndings);
+  on($('introExtraBtn'), 'click', openExtra);
+  on($('extraClose'), 'click', closeExtra);
+  on($('extraModal'), 'click', e => { if (e.target === $('extraModal')) closeExtra(); });
+  on($('openDocsBtn'), 'click', () => { closeExtra(); openDocs(); });
+  on($('docsClose'), 'click', closeDocs);
+  on($('docsModal'), 'click', e => { if (e.target === $('docsModal')) closeDocs(); });
+  on($('docReaderClose'), 'click', closeDocReader);
+  on($('docReaderModal'), 'click', e => { if (e.target === $('docReaderModal')) closeDocReader(); });
+
   on($('openEndingsBtn'), 'click', openEndings);
   on($('endingsClose'), 'click', closeEndings);
   on($('endingsModal'), 'click', e => {
@@ -1258,6 +1434,9 @@ function wireUI() {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if ($('clearConfirmModal') && $('clearConfirmModal').classList.contains('open')) closeClearConfirm();
+      else if ($('docReaderModal') && $('docReaderModal').classList.contains('open')) closeDocReader();
+      else if ($('docsModal') && $('docsModal').classList.contains('open')) closeDocs();
+      else if ($('extraModal') && $('extraModal').classList.contains('open')) closeExtra();
       else if ($('endingsModal') && $('endingsModal').classList.contains('open')) closeEndings();
       else if ($('settingsModal') && $('settingsModal').classList.contains('open')) closeSettings();
       else if (started && $('ending') && $('ending').classList.contains('hidden')) {
@@ -1301,6 +1480,10 @@ const st = $('soundToggle');
 if (st) st.textContent = '♫ AUDIO: ' + (audioOn ? 'ON' : 'OFF');
 updateSettingsUI();
 refreshIntroMeta();
+// Documentos base siempre disponibles
+['d01','d10','d30','d37'].forEach(id => unlockDocument(id, true));
+updateDocsUI();
+
 
 const vb = $('versionBadge');
 if (vb) vb.textContent = 'v' + APP_VERSION;
