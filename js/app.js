@@ -1,24 +1,21 @@
-/* TEST SUBJECT — App logic BUILD 6.0 */
+/* TEST SUBJECT — App logic BUILD 6.1 */
 (() => {
 'use strict';
 
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
-const STORAGE_KEY = 'ts09_save_v5';
-const APP_VERSION = '6.0';
+const STORAGE_KEY = 'ts09_save_v7';
+const APP_VERSION = '7.1';
 
-const ENDING_DEFS = [
-  { id: 'clean', title: 'EVALUACIÓN COMPLETADA', blurb: 'Sesión limpia. La Unidad 04 archiva sin residuales. Que descanses.' },
-  { id: 'anomaly', title: 'SESIÓN CERRADA CON ANOMALÍAS', blurb: 'Hubo inconsistencias. El archivo debería borrarse al cerrar… en teoría.' },
-  { id: 'mirror', title: '¿QUIÉN EVALÚA A QUIÉN?', blurb: 'El registro dice que terminó. Tú sigues esperando la siguiente línea.' },
-  { id: 'never_for_you', title: 'EL TEST NUNCA FUE PARA TI', blurb: 'No medía presencia. Medía si seguirías cuando el sistema dejara de fingir.' },
-  { id: 'dont_close', title: 'NO CIERRES LA PESTAÑA TODAVÍA', blurb: 'El protocolo acabó. Algo usa estas palabras para quedarse un poco más.' },
-  { id: 'silent', title: 'SUJETO EN SILENCIO', blurb: 'Respondiste poco. Aun así, el silencio también es un perfil.' },
-  { id: 'archive_leak', title: 'FUGA DE ARCHIVO', blurb: 'Desbloqueaste demasiados residuos. La Unidad 04 ya no es solo una entrevista.' },
-  { id: 'unit_fail', title: 'FALLO DE UNIDAD', blurb: 'El tono se rompió. Por un momento dejó de ser protocolo y fue casi alguien.' },
-  { id: 'recursive', title: 'SESIÓN RECURSIVA', blurb: 'Has vuelto demasiadas veces. El sistema ya no distingue si eres sujeto o hábito.' },
-  { id: 'witness', title: 'TESTIGO DEL PROTOCOLO', blurb: 'Leíste entre líneas. No eras el experimento: eras quien lo sostenía abierto.' }
-];
+function getUnitEndings() {
+  const u = getActiveUnit();
+  if (u && u.endings && u.endings.length) return u.endings;
+  return [{ id: 'clean', title: 'EVALUACIÓN COMPLETADA', blurb: 'Sesión archivada.' }];
+}
+function endingStorageKey(id) {
+  const uid = (saveData && saveData.activeUnit) || 'u04';
+  return uid + ':' + id;
+}
 
 let idx = 0;
 let questions = [];
@@ -37,10 +34,71 @@ let silenceTimer = null;
 let transitionTimer = null;
 let poolSize = 0;
 let horrorMusicStarted = false;
-let sessionHorrorAt = 13; // se fija al iniciar partida (13–15)
+let sessionHorrorAt = 13;
+let minigameOpen = false;
+function getActiveUnit() {
+  const id = (saveData && saveData.activeUnit) || 'u04';
+  return (window.TSUnits && TSUnits.getUnit(id)) || { id: 'u04', name: 'UNIDAD 04', colors: {}, intro: {}, speaker: 'ENTREVISTADOR // UNIDAD 04' };
+}
+function applyUnitTheme() {
+  const u = getActiveUnit();
+  const c = u.colors || {};
+  const root = document.documentElement;
+  if (c.bg) document.body.style.background = c.bg;
+  if (c.green) root.style.setProperty('--green', c.green);
+  const h2 = document.querySelector('#intro h2');
+  const line = $('introAiLine');
+  const sub = document.querySelector('#intro .sub');
+  if (h2 && u.intro) h2.textContent = u.intro.h2 || h2.textContent;
+  if (line && u.intro) line.textContent = u.intro.line || '';
+  if (sub && u.intro && u.intro.body) {
+    sub.innerHTML = u.intro.body.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+  }
+  const brand = document.querySelector('.brand');
+  if (brand) brand.textContent = '◈ ' + (u.name || 'TEST SUBJECT');
+  applyUnitFace('calm');
+  updateSettingsUI();
+}
+function applyUnitFace(level) {
+  const u = getActiveUnit();
+  const fset = (u.face && u.face[level]) || (u.face && u.face.calm) || { eyes: '• •', mouth: '﹀' };
+  const ey = $('eyes'), mo = $('mouth'), introFace = $('introFace');
+  if (ey) ey.textContent = fset.eyes;
+  if (mo) mo.textContent = fset.mouth;
+  if (introFace) introFace.textContent = (fset.mouth && fset.mouth.trim()) ? fset.mouth : '◡';
+}
+
+function addCE(n) {
+  saveData.ce = (saveData.ce || 0) + n;
+  persist();
+  updateCEUI();
+}
+function updateCEUI() {
+  const n = saveData.ce || 0;
+  ['ceDisplay', 'shopCe'].forEach(id => {
+    const el = $(id);
+    if (el) el.textContent = (id === 'shopCe' ? String(n) : ('CRÉDITOS DE EVALUACIÓN (CE): ' + n));
+  });
+}
+
 let saveData = loadSave();
 
 const music = { calm: null, horror: null, current: null, unlocked: false };
+function getMusicVol() {
+  const v = saveData.settings && saveData.settings.musicVol;
+  return typeof v === 'number' ? Math.max(0, Math.min(1, v)) : 0.55;
+}
+function getSfxVol() {
+  const v = saveData.settings && saveData.settings.sfxVol;
+  return typeof v === 'number' ? Math.max(0, Math.min(1, v)) : 0.7;
+}
+function applyMusicVolumes() {
+  const mv = getMusicVol();
+  if (music.calm) music.calm.volume = (music.current === music.calm && !music.calm.paused) ? mv : mv;
+  if (music.horror) music.horror.volume = (music.current === music.horror && !music.horror.paused) ? mv : mv;
+  if (music.current && !music.current.paused) music.current.volume = mv;
+}
+
 
 function initMusic() {
   try {
@@ -98,7 +156,7 @@ function startCalmInstant() {
 
   try {
     a.muted = false;
-    a.volume = 0.55;
+    a.volume = getMusicVol();
     if (a.readyState < 2) {
       // Forzar buffer; play igual se intenta
       try { a.load(); } catch (e) {}
@@ -141,7 +199,7 @@ async function playTrack(which) {
   if (!next) return;
   if (prev === next && !prev.paused) return;
   try {
-    const targetVol = which === 'horror' ? 0.6 : 0.55;
+    const targetVol = getMusicVol();
     if (!prev || prev.paused) {
       next.volume = targetVol;
       music.current = next;
@@ -227,8 +285,12 @@ function defaultSave() {
     playCount: 0,
     discoveredEndings: [],
     documents: [],
+    ce: 0,
+    unlockedUnits: ['u04'],
+    activeUnit: 'u04',
+    unlockedMinigames: [],
     past: { names: [], trusts: [], secrets: [], wakes: [], safes: [], answers: [], recentQuestions: [] },
-    settings: { sound: true, layout: 'auto' }
+    settings: { sound: true, layout: 'auto', musicVol: 0.55, sfxVol: 0.7 }
   };
 }
 function loadSave() {
@@ -239,6 +301,9 @@ function loadSave() {
     return Object.assign(defaultSave(), d, {
       past: Object.assign(defaultSave().past, d.past || {}),
       documents: Array.isArray(d.documents) ? d.documents : [],
+      ce: typeof d.ce === 'number' ? d.ce : 0,
+      unlockedUnits: Array.isArray(d.unlockedUnits) ? d.unlockedUnits : ['u04'],
+      activeUnit: d.activeUnit || 'u04',
       settings: Object.assign(defaultSave().settings, d.settings || {})
     });
   } catch (e) { return defaultSave(); }
@@ -247,8 +312,9 @@ function persist() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData)); } catch (e) {}
 }
 function unlockEnding(id) {
-  if (!saveData.discoveredEndings.includes(id)) {
-    saveData.discoveredEndings.push(id);
+  const key = endingStorageKey(id);
+  if (!saveData.discoveredEndings.includes(key) && !saveData.discoveredEndings.includes(id)) {
+    saveData.discoveredEndings.push(key);
     persist();
   }
 }
@@ -260,6 +326,23 @@ function applyLayout(mode) {
   saveData.settings.layout = mode;
   persist();
   updateSettingsUI();
+}
+
+
+function setMusicVol(pct) {
+  const v = Math.max(0, Math.min(100, Number(pct))) / 100;
+  saveData.settings.musicVol = v;
+  persist();
+  applyMusicVolumes();
+  const lab = $('musicVolLabel');
+  if (lab) lab.textContent = Math.round(v * 100) + '%';
+}
+function setSfxVol(pct) {
+  const v = Math.max(0, Math.min(100, Number(pct))) / 100;
+  saveData.settings.sfxVol = v;
+  persist();
+  const lab = $('sfxVolLabel');
+  if (lab) lab.textContent = Math.round(v * 100) + '%';
 }
 
 function applySoundSetting(on) {
@@ -296,6 +379,17 @@ function toggleFullscreen() {
 
 function updateSettingsUI() {
   const s = saveData.settings;
+  if (s.musicVol == null) s.musicVol = 0.55;
+  if (s.sfxVol == null) s.sfxVol = 0.7;
+  const mv = $('musicVol');
+  const sv = $('sfxVol');
+  if (mv) mv.value = Math.round((s.musicVol || 0.55) * 100);
+  if (sv) sv.value = Math.round((s.sfxVol || 0.7) * 100);
+  const mvl = $('musicVolLabel');
+  const svl = $('sfxVolLabel');
+  if (mvl) mvl.textContent = Math.round((s.musicVol || 0.55) * 100) + '%';
+  if (svl) svl.textContent = Math.round((s.sfxVol || 0.7) * 100) + '%';
+
   [['optSoundOn', s.sound], ['optSoundOff', !s.sound]].forEach(([id, onState]) => {
     const el = $(id);
     if (!el) return;
@@ -310,24 +404,31 @@ function updateSettingsUI() {
     const inp = el.querySelector('input');
     if (inp) inp.checked = onState;
   });
+  const defs = getUnitEndings();
+  const uid = (saveData.activeUnit || 'u04');
+  const unlockedCount = defs.filter(def => {
+    const k = uid + ':' + def.id;
+    return (saveData.discoveredEndings || []).includes(k) || (saveData.discoveredEndings || []).includes(def.id);
+  }).length;
+  const ec = $('endingCount');
+  if (ec) ec.textContent = '(' + unlockedCount + '/' + defs.length + ')';
+  const eci = $('endingCountIntro');
+  if (eci) eci.textContent = '(' + unlockedCount + '/' + defs.length + ')';
+  updateDocsUI();
   const list = $('endingList');
   if (!list) return;
   list.innerHTML = '';
-  const n = (saveData.discoveredEndings || []).length;
-  const ec = $('endingCount');
-  if (ec) ec.textContent = '(' + n + '/' + ENDING_DEFS.length + ')';
-  const eci = $('endingCountIntro');
-  if (eci) eci.textContent = '(' + n + '/' + ENDING_DEFS.length + ')';
-  updateDocsUI();
-  ENDING_DEFS.forEach(def => {
-    const unlocked = saveData.discoveredEndings.includes(def.id);
+  defs.forEach(def => {
+    const k = uid + ':' + def.id;
+    const unlocked = (saveData.discoveredEndings || []).includes(k) || (saveData.discoveredEndings || []).includes(def.id);
     const div = document.createElement('div');
     div.className = 'ending-item ' + (unlocked ? 'unlocked' : 'locked');
     div.innerHTML = unlocked
-      ? '<div class="etitle">✓ ' + def.title + '</div>' + def.blurb
-      : '<div class="etitle">🔒 ???</div>Final aún no descubierto.';
+      ? '<div class="etitle">' + def.title + '</div><div>' + def.blurb + '</div>'
+      : '<div class="etitle">🔒 ???</div><div>Final aún no descubierto.</div>';
     list.appendChild(div);
   });
+
 }
 
 function openSettings() {
@@ -342,6 +443,8 @@ function closeSettings() {
 function openEndings() {
   updateSettingsUI();
   const m = $('endingsModal');
+  const h = m && m.querySelector('h3');
+  if (h) h.textContent = '◈ FINALES · ' + (getActiveUnit().name || '');
   if (m) m.classList.add('open');
 }
 function closeEndings() {
@@ -356,6 +459,7 @@ function ensureCtx() {
 }
 function sound(type) {
   if (!audioOn) return;
+  const sfxScale = getSfxVol();
   const c = ensureCtx();
   if (!c) return;
   try {
@@ -378,7 +482,7 @@ function sound(type) {
     else if (type === 'error') o.frequency.exponentialRampToValueAtTime(35, c.currentTime + 0.35);
     else if (type === 'drop') o.frequency.exponentialRampToValueAtTime(28, c.currentTime + 0.6);
     else o.frequency.exponentialRampToValueAtTime(f * 0.65, c.currentTime + dur * 0.7);
-    g.gain.setValueAtTime(vol, c.currentTime);
+    g.gain.setValueAtTime(vol * (typeof sfxScale === "number" ? sfxScale : 1), c.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
     o.start(); o.stop(c.currentTime + dur);
   } catch (e) {}
@@ -479,11 +583,17 @@ function updateHUD() {
   else if (unsettling < 15) { if (sv) sv.textContent = 'NO CONFIABLE'; if (ss) ss.textContent = 'NO MIRES ATRÁS'; }
   else { if (sv) sv.textContent = 'COLAPSO'; if (ss) ss.textContent = '¿QUIÉN CONTROLA ESTO?'; }
   const sp = $('speaker'), ey = $('eyes'), mo = $('mouth');
-  if (unsettling < 5) { if (sp) sp.textContent = 'ENTREVISTADOR // UNIDAD 04'; if (ey) ey.textContent = '• •'; if (mo) mo.textContent = '﹀'; }
-  else if (unsettling < 8) { if (sp) sp.textContent = 'UNIDAD 04 // REGISTRO'; if (ey) ey.textContent = '• •'; if (mo) mo.textContent = '﹀'; }
-  else if (unsettling < 11) { if (sp) sp.textContent = 'UNIDAD 04 // ¿SIGUES AHÍ?'; if (ey) ey.textContent = '◉ ◉'; if (mo) mo.textContent = '︵'; }
-  else if (unsettling < 14) { if (sp) sp.textContent = 'NO SOY LA UNIDAD 04'; if (ey) ey.textContent = '◉　◉'; if (mo) mo.textContent = '⌁'; }
-  else { if (sp) sp.textContent = '████ // ESCUCHA'; if (ey) ey.textContent = '× ×'; if (mo) mo.textContent = '▬'; }
+  const u = getActiveUnit();
+  const faceLv = unsettling < 8 ? 'calm' : (unsettling < 13 ? 'mid' : 'dark');
+  const fset = (u.face && u.face[faceLv]) || { eyes: '• •', mouth: '﹀' };
+  if (sp) {
+    if (unsettling < 5) sp.textContent = u.speaker || 'ENTREVISTADOR';
+    else if (unsettling < 10) sp.textContent = (u.name || 'UNIDAD') + ' // REGISTRO';
+    else if (unsettling < 14) sp.textContent = (u.name || 'UNIDAD') + ' // ¿SIGUES AHÍ?';
+    else sp.textContent = '████ // ESCUCHA';
+  }
+  if (ey) ey.textContent = fset.eyes;
+  if (mo) mo.textContent = fset.mouth;
   const fr = $('footRight'), fl = $('footLeft');
   if (fr) fr.textContent = 'MEMORIA: ' + answers.length + ' REGISTROS';
   if (fl) {
@@ -792,13 +902,11 @@ function begin() {
   }
   unlockAndStartCalm();
   ensureCtx();
-  sessionHorrorAt = 13 + Math.floor(Math.random() * 3); // 13, 14 o 15
+  sessionHorrorAt = 13 + Math.floor(Math.random() * 3);
   horrorMusicStarted = false;
+  applyUnitTheme();
 
-  const picked = window.TSQuestions.pickSessionQuestions(
-    Object.assign({}, saveData.past, { playCount: saveData.playCount }),
-    20
-  );
+  const picked = window.TSQuestions.pickSessionQuestions(Object.assign({}, saveData.past, { playCount: saveData.playCount }), 20, saveData.activeUnit || 'u04');
   questions = picked.questions;
   poolSize = picked.poolSize;
   idx = 0; answers = []; memory = {}; unsettling = 0; hesitationCount = 0;
@@ -975,6 +1083,14 @@ on($('answerForm'), 'submit', async e => {
     // Comentario humano entre preguntas (no en la última)
     if (idx < questions.length) {
       await sayBetweenQuestions(idx);
+      // Prueba aleatoria entre preguntas (avisada por la unidad)
+      if (idx >= 5 && idx < questions.length - 1 && Math.random() < 0.28) {
+        addLine('Voy a someterte a una prueba breve de seguridad. No forma parte del cuestionario… o eso dice el protocolo.', 'system', 'whisper');
+        await typeText('Voy a someterte a una prueba breve de seguridad.', 22);
+        await new Promise(r => setTimeout(r, 600));
+        await launchMinigame();
+        await new Promise(r => setTimeout(r, 400));
+      }
     }
     showQuestion();
   }, wait);
@@ -1066,45 +1182,33 @@ function finish() {
   let endingId = 'clean';
   let text = '';
 
-  if (plays >= 5 && unsettling >= 8) {
-    endingId = 'recursive';
-    text = 'Has abierto esta evaluación demasiadas veces. La Unidad 04 ya no te saluda como a un desconocido: te saluda como a un hábito. ' + (memory.name ? memory.name + ', ' : '') + '¿buscas un final distinto o que alguien te reconozca?';
-  } else if (docsN >= 20) {
-    endingId = 'archive_leak';
-    text = 'Has leído demasiado del archivo. Ya no eres solo un sujeto: eres alguien que abrió cajones que el protocolo prefería cerrados. La Unidad 04 te observa con menos distancia.';
-  } else if (docsN >= 8 && unsettling >= 10) {
-    endingId = 'witness';
-    text = 'No solo contestaste: prestaste atención al marco. El test medía presencia; tú mediste el test. Eso te convierte en testigo… y a mí, en algo menos seguro de mi rol.';
-  } else if (shortHeavy) {
-    endingId = 'silent';
-    text = 'Respondiste con muy poco. Aun así, el silencio dibuja un perfil. La Unidad 04 archiva los huecos con el mismo cuidado que las confesiones.';
-  } else if (unsettling >= 14) {
-    endingId = 'unit_fail';
-    text = 'El tono se rompió antes de tiempo. Durante unos segundos dejé de ser protocolo. Si eso te inquieta, es mutuo. ' + (memory.name ? 'Adiós, ' + memory.name + '.' : '');
-  } else if (unsettling >= 11) {
-    endingId = 'dont_close';
-    text = 'El protocolo terminó. La Unidad 04 ya no debería existir en esta pestaña. Y sin embargo estás leyendo esto. ' + (memory.name ? memory.name + '. ' : '') + 'Decide con cuidado si cierras.';
-  } else if (unsettling >= 12) {
-    endingId = 'never_for_you';
-    text = 'Has respondido a todo. Has dudado. Esto no era solo una evaluación de presencia: era una evaluación de si alguien seguiría cuando el sistema dejara de fingir. ' + (memory.name ? 'Adiós, ' + memory.name + '.' : 'Adiós.');
-  } else if (unsettling >= 5) {
-    endingId = 'mirror';
-    text = 'El registro dice que la sesión terminó. Tú sigues aquí, esperando una frase más. ¿Quién estaba evaluando a quién?';
-  } else if (unsettling >= 2) {
-    endingId = 'anomaly';
-    text = 'Algunas respuestas generaron inconsistencias menores. El archivo se eliminará al cerrar esta pestaña. ' + (memory.name ? memory.name + ', ' : '') + 'descansa… si puedes.';
-  } else {
-    endingId = 'clean';
-    text = 'Evaluación completada sin residuales graves. Gracias por tu tiempo. La Unidad 04 archiva la sesión y te desea una noche ordinaria.';
-  }
+  let endingIdx = 0;
+  if (plays >= 5 && unsettling >= 8) endingIdx = 8;
+  else if (docsN >= 20) endingIdx = 6;
+  else if (docsN >= 8 && unsettling >= 10) endingIdx = 9;
+  else if (shortHeavy) endingIdx = 5;
+  else if (unsettling >= 14) endingIdx = 7;
+  else if (unsettling >= 11) endingIdx = 4;
+  else if (unsettling >= 8) endingIdx = 3;
+  else if (unsettling >= 5) endingIdx = 2;
+  else if (unsettling >= 2) endingIdx = 1;
+  else endingIdx = 0;
 
-  unlockEnding(endingId);
+  const unitEnds = getUnitEndings();
+  const endDef = unitEnds[Math.min(endingIdx, unitEnds.length - 1)] || unitEnds[0];
+  endingId = endDef.id;
+  text = endDef.blurb + (memory.name ? (' ' + memory.name + '.') : '');
+  // Textos algo más largos según tensión
+  if (endingIdx >= 7) text += ' El protocolo no bastó para contener lo que ocurrió en la sesión.';
+  else if (endingIdx >= 4) text += ' La finalización no garantiza el cierre inmediato del expediente.';
+
+    unlockEnding(endingId);
   checkDocumentUnlocks({ phase: 4, key: '', answer: '', q: { phase: 4 } });
   // docs tied to endings
   if (endingId === 'mirror') unlockDocument('d42', false);
   if (endingId === 'dont_close') unlockDocument('d44', false);
 
-  const def = ENDING_DEFS.find(e => e.id === endingId) || ENDING_DEFS[0];
+  const def = getUnitEndings().find(e => e.id === endingId) || getUnitEndings()[0];
   const et = $('endingTitle');
   const etx = $('endingText');
   if (et) et.textContent = def.title;
@@ -1277,6 +1381,7 @@ function checkDocumentUnlocks(ctx) {
         else ok = (saveData.discoveredEndings || []).includes(rule.value);
         break;
       case 'docs': ok = docsN >= rule.value; break;
+      case 'shop': ok = false; break;
       default: break;
     }
     if (ok) unlockDocument(doc.id, false);
@@ -1330,6 +1435,7 @@ function closeDocs() {
 }
 function openExtra() {
   updateDocsUI();
+  updateCEUI();
   const m = $('extraModal');
   if (m) m.classList.add('open');
 }
@@ -1348,6 +1454,193 @@ function setSettingsTab(panelId) {
 }
 
 
+
+function openShop() {
+  updateCEUI();
+  const list = $('shopList');
+  if (!list) return;
+  list.innerHTML = '';
+  // Documents
+  const shopDocs = (window.TSDocuments && TSDocuments.SHOP_DOCS) || [];
+  shopDocs.forEach(item => {
+    const doc = TSDocuments.getDoc(item.id);
+    if (!doc) return;
+    const owned = isDocUnlocked(item.id);
+    const div = document.createElement('div');
+    div.className = 'shop-item';
+    div.innerHTML = '<div class="dtitle">' + doc.title + '</div><div class="dcat">' + doc.cat + '</div>' +
+      '<div class="price">' + (owned ? 'YA EN ARCHIVO' : (item.price + ' CE')) + '</div>';
+    if (!owned) {
+      const btn = document.createElement('button');
+      btn.className = 'button';
+      btn.textContent = 'COMPRAR';
+      btn.style.marginTop = '8px';
+      btn.onclick = () => {
+        if ((saveData.ce || 0) < item.price) { showSysMsg('CE INSUFICIENTES', 2000, true); return; }
+        saveData.ce -= item.price;
+        unlockDocument(item.id, false);
+        persist();
+        updateCEUI();
+        openShop();
+        showSysMsg('DOCUMENTO ADQUIRIDO', 2000);
+      };
+      div.appendChild(btn);
+    }
+    list.appendChild(div);
+  });
+  // Units in shop
+  if (window.TSUnits) {
+    TSUnits.listUnits().forEach(u => {
+      if (u.id === 'u04') return;
+      const owned = (saveData.unlockedUnits || []).includes(u.id);
+      const div = document.createElement('div');
+      div.className = 'shop-item';
+      div.innerHTML = '<div class="dtitle">' + u.name + ' — ' + u.title + '</div><div class="dcat">' + u.shopBlurb + '</div>' +
+        '<div class="price">' + (owned ? 'DESBLOQUEADA' : (u.unlock + ' CE')) + '</div>';
+      if (!owned) {
+        const btn = document.createElement('button');
+        btn.className = 'button';
+        btn.textContent = 'DESBLOQUEAR UNIDAD';
+        btn.style.marginTop = '8px';
+        btn.onclick = () => {
+          if ((saveData.ce || 0) < u.unlock) { showSysMsg('CE INSUFICIENTES', 2000, true); return; }
+          saveData.ce -= u.unlock;
+          saveData.unlockedUnits = saveData.unlockedUnits || ['u04'];
+          if (!saveData.unlockedUnits.includes(u.id)) saveData.unlockedUnits.push(u.id);
+          persist();
+          updateCEUI();
+          openShop();
+          showSysMsg(u.name + ' DISPONIBLE', 2200);
+        };
+        div.appendChild(btn);
+      }
+      list.appendChild(div);
+    });
+  }
+  const m = $('shopModal');
+  if (m) m.classList.add('open');
+}
+function closeShop() { const m = $('shopModal'); if (m) m.classList.remove('open'); }
+
+function openUnits() {
+  const list = $('unitsList');
+  if (!list || !window.TSUnits) return;
+  list.innerHTML = '';
+  TSUnits.listUnits().forEach(u => {
+    const owned = (saveData.unlockedUnits || ['u04']).includes(u.id);
+    const active = saveData.activeUnit === u.id;
+    const div = document.createElement('div');
+    div.className = 'unit-item';
+    div.innerHTML = '<div class="dtitle">' + u.name + (active ? ' · ACTIVA' : '') + '</div>' +
+      '<div class="dcat">' + u.title + '</div><div class="price">' + (owned ? 'Disponible' : ('Bloqueada · ' + u.unlock + ' CE en tienda')) + '</div>';
+    if (owned && !active) {
+      const btn = document.createElement('button');
+      btn.className = 'button';
+      btn.textContent = 'ACTIVAR';
+      btn.style.marginTop = '8px';
+      btn.onclick = () => {
+        saveData.activeUnit = u.id;
+        persist();
+        applyUnitTheme();
+        updateSettingsUI();
+        openUnits();
+        showSysMsg(u.name + ' ACTIVA', 2000);
+      };
+      div.appendChild(btn);
+    }
+    list.appendChild(div);
+  });
+  const m = $('unitsModal');
+  if (m) m.classList.add('open');
+}
+function closeUnits() { const m = $('unitsModal'); if (m) m.classList.remove('open'); }
+
+function launchMinigame(opts) {
+  opts = opts || {};
+  const practice = !!opts.practice;
+  const forcedType = opts.type || null;
+  return new Promise(resolve => {
+    if (!window.TSMinigames) { resolve(false); return; }
+    minigameOpen = true;
+    const ov = $('mgOverlay');
+    const root = $('mgRoot');
+    if (!ov || !root) { resolve(false); return; }
+    ov.classList.add('open');
+    const done = (ok, ce, typeId) => {
+      ov.classList.remove('open');
+      root.innerHTML = '';
+      minigameOpen = false;
+      if (ok && typeId) {
+        saveData.unlockedMinigames = saveData.unlockedMinigames || [];
+        if (!saveData.unlockedMinigames.includes(typeId)) {
+          saveData.unlockedMinigames.push(typeId);
+          persist();
+        }
+      }
+      const u = getActiveUnit();
+      if (!practice && ok && ce) {
+        addCE(ce);
+        const lines = u.mgOk || ['Prueba superada. +{ce} CE.'];
+        const line = lines[Math.floor(Math.random() * lines.length)].replace(/\{ce\}/g, String(ce));
+        addLine(line, 'system');
+        typeText(line, 20);
+        showSysMsg('+' + ce + ' CE', 2400);
+        sound('good');
+      } else if (!practice && !ok) {
+        const lines = u.mgFail || ['Prueba fallida.'];
+        const line = lines[Math.floor(Math.random() * lines.length)];
+        addLine(line, 'system', 'whisper');
+        showSysMsg('SIN CE', 2000, true);
+        sound('error');
+      } else if (practice) {
+        showSysMsg(ok ? 'PRUEBA COMPLETADA (SIN CE)' : 'PRUEBA FALLIDA', 2200, !ok);
+      }
+      resolve(ok);
+    };
+    if (forcedType) {
+      const t = TSMinigames.TYPES.find(x => x.id === forcedType) || TSMinigames.TYPES[0];
+      t.run(root, (ok, ce) => done(ok, ce, t.id));
+    } else {
+      const t = TSMinigames.startRandom(root, (ok, ce) => {
+        // startRandom doesn't pass type - track via closure
+      });
+      // re-call with known type
+      const pick = TSMinigames.TYPES[Math.floor(Math.random() * TSMinigames.TYPES.length)];
+      pick.run(root, (ok, ce) => done(ok, ce, pick.id));
+    }
+  });
+}
+
+function openMinigamesExtra() {
+  const list = $('mgList');
+  if (!list || !window.TSMinigames) return;
+  list.innerHTML = '';
+  const unlocked = saveData.unlockedMinigames || [];
+  TSMinigames.TYPES.forEach(t => {
+    const own = unlocked.includes(t.id);
+    const div = document.createElement('div');
+    div.className = 'shop-item';
+    div.innerHTML = '<div class="dtitle">' + t.name + '</div><div class="dcat">' +
+      (own ? 'Desbloqueado · práctica sin CE' : 'Bloqueado · supéralo en una entrevista') + '</div>';
+    if (own) {
+      const btn = document.createElement('button');
+      btn.className = 'button';
+      btn.textContent = 'JUGAR';
+      btn.style.marginTop = '8px';
+      btn.onclick = () => { closeExtra(); launchMinigame({ practice: true, type: t.id }); };
+      div.appendChild(btn);
+    }
+    list.appendChild(div);
+  });
+  const m = $('mgListModal');
+  if (m) m.classList.add('open');
+  else {
+    // fallback: use extra section only via button
+  }
+}
+
+
+
 function wireUI() {
   on($('settingsOpen'), 'click', openSettings);
   on($('settingsOpen2'), 'click', openSettings);
@@ -1364,6 +1657,18 @@ function wireUI() {
   on($('extraClose'), 'click', closeExtra);
   on($('extraModal'), 'click', e => { if (e.target === $('extraModal')) closeExtra(); });
   on($('openDocsBtn'), 'click', () => { closeExtra(); openDocs(); });
+
+  on($('openShopBtn'), 'click', () => { closeExtra(); openShop(); });
+  on($('shopClose'), 'click', closeShop);
+  on($('shopModal'), 'click', e => { if (e.target === $('shopModal')) closeShop(); });
+  on($('openUnitsBtn'), 'click', () => { closeExtra(); openUnits(); });
+  on($('openMgBtn'), 'click', () => { closeExtra(); openMinigamesExtra(); });
+  on($('mgListClose'), 'click', () => { const m = $('mgListModal'); if (m) m.classList.remove('open'); });
+  on($('mgListModal'), 'click', e => { if (e.target === $('mgListModal')) { const m = $('mgListModal'); if (m) m.classList.remove('open'); } });
+
+  on($('unitsClose'), 'click', closeUnits);
+  on($('unitsModal'), 'click', e => { if (e.target === $('unitsModal')) closeUnits(); });
+
   on($('docsClose'), 'click', closeDocs);
   on($('docsModal'), 'click', e => { if (e.target === $('docsModal')) closeDocs(); });
   on($('docReaderClose'), 'click', closeDocReader);
@@ -1378,6 +1683,9 @@ function wireUI() {
     if (e.target === $('settingsModal')) closeSettings();
   });
   on($('optSoundOn'), 'click', () => applySoundSetting(true));
+  on($('musicVol'), 'input', e => setMusicVol(e.target.value));
+  on($('sfxVol'), 'input', e => setSfxVol(e.target.value));
+
   on($('optSoundOff'), 'click', () => applySoundSetting(false));
   on($('optLayoutAuto'), 'click', () => applyLayout('auto'));
   on($('optLayoutMobile'), 'click', () => applyLayout('mobile'));
@@ -1436,6 +1744,8 @@ function wireUI() {
       if ($('clearConfirmModal') && $('clearConfirmModal').classList.contains('open')) closeClearConfirm();
       else if ($('docReaderModal') && $('docReaderModal').classList.contains('open')) closeDocReader();
       else if ($('docsModal') && $('docsModal').classList.contains('open')) closeDocs();
+      else if ($('shopModal') && $('shopModal').classList.contains('open')) closeShop();
+      else if ($('unitsModal') && $('unitsModal').classList.contains('open')) closeUnits();
       else if ($('extraModal') && $('extraModal').classList.contains('open')) closeExtra();
       else if ($('endingsModal') && $('endingsModal').classList.contains('open')) closeEndings();
       else if ($('settingsModal') && $('settingsModal').classList.contains('open')) closeSettings();
@@ -1481,8 +1791,13 @@ if (st) st.textContent = '♫ AUDIO: ' + (audioOn ? 'ON' : 'OFF');
 updateSettingsUI();
 refreshIntroMeta();
 // Documentos base siempre disponibles
-['d01','d10','d30','d37'].forEach(id => unlockDocument(id, true));
+['d01','d02','d17','d21'].forEach(id => unlockDocument(id, true));
 updateDocsUI();
+updateCEUI();
+if (!saveData.unlockedUnits) saveData.unlockedUnits = ['u04'];
+if (!saveData.activeUnit) saveData.activeUnit = 'u04';
+applyUnitTheme();
+
 
 
 const vb = $('versionBadge');

@@ -245,10 +245,12 @@
   }
 
   // Expand one template into many variants
-  function expandTemplate(t, phase) {
+  function expandTemplate(t, phase, unitId) {
+    unitId = unitId || 'u04';
+    const pack = UNIT_PACKS[unitId] || {};
+    const prefs = (pack.prefixes && pack.prefixes[phase]) || PREFIXES[phase] || [''];
+    const suffs = (pack.suffixes && pack.suffixes[phase]) || SUFFIXES[phase] || [''];
     const out = [];
-    const prefs = PREFIXES[phase] || [''];
-    const suffs = SUFFIXES[phase] || [''];
     prefs.forEach(pre => {
       suffs.forEach(suf => {
         const q = (pre + t.q + suf).replace(/\s+/g, ' ').trim();
@@ -266,11 +268,21 @@
   }
 
   // Build full virtual pool (well over 1000 with expansions + hooks)
-  function buildPool(pastMemories) {
+  function buildPool(pastMemories, unitId) {
+    unitId = unitId || 'u04';
+    const pack = UNIT_PACKS[unitId] || UNIT_PACKS.u04 || {};
     const pool = { 1: [], 2: [], 3: [], 4: [] };
     [1, 2, 3, 4].forEach(ph => {
-      (BASE[ph] || []).forEach(t => {
-        expandTemplate(t, ph).forEach(v => pool[ph].push(v));
+      // Plantillas base + exclusivas de la unidad
+      const templates = (BASE[ph] || []).slice();
+      if (pack.extra && pack.extra[ph]) {
+        pack.extra[ph].forEach(t => templates.push(t));
+      }
+      templates.forEach(t => {
+        expandTemplate(t, ph, unitId).forEach(v => {
+          v.unit = unitId;
+          pool[ph].push(v);
+        });
       });
     });
     memoryHooks(pastMemories).forEach(h => {
@@ -308,14 +320,17 @@
       '¿Prefieres terminar pronto o seguir un poco más?',
       '¿El borde de la pantalla parece más cerca que antes?'
     ];
+    const pack2 = UNIT_PACKS[unitId] || {};
     shadows.forEach((sq, i) => {
       const ph = (i % 4) + 1;
-      PREFIXES[ph].forEach(pre => {
+      const prefs = (pack2.prefixes && pack2.prefixes[ph]) || PREFIXES[ph] || [''];
+      prefs.forEach(pre => {
         pool[ph].push({
           q: (pre + sq).trim(),
           tag: 'SOMBRA // ' + String(i + 1).padStart(2, '0'),
           key: null,
           phase: ph,
+          unit: unitId,
           normal: null,
           strange: null
         });
@@ -329,9 +344,182 @@
   }
 
   // Select 20 questions: balanced phases, no exact q repeat in session, prefer unused keys
-  function pickSessionQuestions(pastMemories, count) {
+
+  // ── Bancos exclusivos por unidad (plantillas + modificadores propios) ──
+  const UNIT_PACKS = {
+    u01: {
+      prefixes: {
+        1: ['', 'Registre: ', 'Con precisión: ', 'Sin adornos: ', 'Dato requerido: ', 'Responda: '],
+        2: ['', 'Observe la discrepancia: ', 'Contraste: ', 'Verifique: ', 'No omita: '],
+        3: ['', 'Anomalía posible: ', 'Cronometre: ', 'Aísle la variable: ', 'Clasifique: '],
+        4: ['', 'Cierre parcial: ', 'Sin protocolo amable: ', 'Estado residual: ', 'Mida: ']
+      },
+      suffixes: {
+        1: ['', ' Sea breve.', ' Evite metáforas.', ' Una frase basta.'],
+        2: ['', ' No se corrija a mitad.', ' El tiempo cuenta.'],
+        3: ['', ' No mire el reloj del sistema.', ' Anote solo lo verificable.'],
+        4: ['', ' El expediente no espera.', ' No hay apelación.']
+      },
+      extra: {
+        1: [
+          { q: 'Indique su identificador preferido. Si no tiene, invente uno estable.', tag: 'ID', key: 'name' },
+          { q: '¿A qué hora exacta inició esta sesión, según su reloj?', tag: 'TIEMPO', key: 'clock' },
+          { q: 'Enumere tres objetos a menos de un metro de usted.', tag: 'INVENTARIO', key: 'object' },
+          { q: '¿Ha completado evaluaciones clínicas previas? Sí, no o no recuerda.', tag: 'HISTORIAL', key: 'history' },
+          { q: 'Describa su postura actual en una palabra.', tag: 'SOMA', key: 'posture' },
+          { q: '¿Su entorno es silencioso, ruidoso o intermitente?', tag: 'AMBIENTE', key: 'sound' },
+          { q: '¿La iluminación es artificial, natural o mixta?', tag: 'LUZ', key: 'light' },
+          { q: 'Indique si está sentado, de pie o en otra posición.', tag: 'POSICIÓN', key: 'pose' }
+        ],
+        2: [
+          { q: 'Su respuesta anterior, ¿la mantendría bajo juramento administrativo?', tag: 'COHERENCIA', key: 'oath' },
+          { q: '¿Detecta alguna inconsistencia entre lo que piensa y lo que escribe?', tag: 'DISCREPANCIA', key: 'gap' },
+          { q: 'Si el registro mostrara una respuesta distinta a la suya, ¿qué haría?', tag: 'REGISTRO', key: 'record' },
+          { q: '¿Ha anticipado alguna pregunta de esta sesión?', tag: 'ANTICIPO', key: 'anticipate' },
+          { q: 'Califique su nivel de fatiga del 1 al 10.', tag: 'FATIGA', key: 'fatigue' }
+        ],
+        3: [
+          { q: '¿Conoce el término «anomalía de continuidad»?', tag: 'GLOSARIO', key: 'anomaly' },
+          { q: 'Si su expediente se reabriera solo, ¿lo reportaría?', tag: 'PROTOCOLO', key: 'reopen' },
+          { q: '¿Aceptaría que otra evaluación usara sus respuestas sin su nombre?', tag: 'ÉTICA', key: 'anon' },
+          { q: '¿Cree que el tiempo entre pregunta y respuesta es medido?', tag: 'LATENCIA', key: 'latency' }
+        ],
+        4: [
+          { q: 'Estado final autoasignado: completo, pendiente o residual.', tag: 'CIERRE', key: 'final' },
+          { q: '¿Desea añadir una corrección al expediente? Si no, escriba «ninguna».', tag: 'ADDENDA', key: 'addenda' },
+          { q: 'Confirme si está solo. Una sola palabra.', tag: 'PRESENCIA', key: 'alone' }
+        ]
+      }
+    },
+    u02: {
+      prefixes: {
+        1: ['', 'Con calma… ', 'Si te apetece decirlo: ', 'Sin prisa: ', 'Entre tú y yo: ', 'Cuando quieras: '],
+        2: ['', 'Sé honesto conmigo: ', 'Aunque duela un poco: ', 'No hace falta que suene bien: ', 'Confía un segundo: '],
+        3: ['', 'Quédate con la sensación: ', 'No mires hacia otro lado: ', 'Dime la verdad blanda: ', 'Si tiembla, también vale: '],
+        4: ['', 'Ya casi no fingimos: ', 'Aquí no hay audiencia: ', 'Solo nosotros: ', 'Antes de que se cierre: ']
+      },
+      suffixes: {
+        1: ['', ' Puedes usar pocas palabras.', ' No te juzgo por la forma.'],
+        2: ['', ' Si no quieres nombres reales, inventa.', ' Respira si hace falta.'],
+        3: ['', ' No tienes que ser valiente.', ' El silencio también es una respuesta… pero escribe algo.'],
+        4: ['', ' Quédate un momento más.', ' No cierres todavía si no quieres.']
+      },
+      extra: {
+        1: [
+          { q: '¿Cómo te gustaría que te llamara esta noche?', tag: 'NOMBRE', key: 'name' },
+          { q: '¿Cuándo fue la última vez que te sentiste realmente acompañado?', tag: 'VÍNCULO', key: 'trust' },
+          { q: '¿Hay alguien a quien no hayas dicho algo importante?', tag: 'SECRETO', key: 'secret' },
+          { q: '¿Qué parte de tu día te pesa más al recordarla?', tag: 'PESO', key: 'weight' },
+          { q: 'Si pudieras oír una voz familiar ahora, ¿de quién sería?', tag: 'VOZ', key: 'voice' },
+          { q: '¿Sueles pedir perdón aunque no sepas exactamente por qué?', tag: 'CULPA', key: 'guilt' },
+          { q: '¿Qué te da miedo admitir en voz alta?', tag: 'MIEDO', key: 'fear' }
+        ],
+        2: [
+          { q: '¿Me estás contando lo mismo que te contarías a alguien de confianza?', tag: 'HONESTIDAD', key: 'honest' },
+          { q: 'Si desaparecieras un día, ¿quién lo notaría primero?', tag: 'AUSENCIA', key: 'gone' },
+          { q: '¿Hay una habitación a la que no quieres volver?', tag: 'LUGAR', key: 'safe' },
+          { q: '¿Prefieres que te entiendan o que te dejen en paz?', tag: 'DESEO', key: 'want' }
+        ],
+        3: [
+          { q: '¿Sientes que esta conversación ya la has tenido con alguien más?', tag: 'ECO', key: 'echo' },
+          { q: 'Si te dijera que me importas dentro de este protocolo, ¿me creerías?', tag: 'APEGO', key: 'care' },
+          { q: '¿Qué necesitarías oír para quedarte un poco más?', tag: 'NECESIDAD', key: 'need' }
+        ],
+        4: [
+          { q: '¿Quieres que recuerde tu nombre cuando esto termine?', tag: 'MEMORIA', key: 'name' },
+          { q: 'Si solo pudieras dejar una frase en el expediente, ¿cuál sería?', tag: 'LEGADO', key: 'final' },
+          { q: '¿Estás solo… de verdad?', tag: 'PRESENCIA', key: 'alone' }
+        ]
+      }
+    },
+    u03: {
+      prefixes: {
+        1: ['', 'Según el archivo: ', 'Antes de Continuidad: ', 'En esta iteración: ', 'Si el registro no miente: '],
+        2: ['', 'Compare con la sesión anterior: ', 'Si ya lo respondió: ', 'Anomalía posible: ', 'No diga que es la primera vez: '],
+        3: ['', 'Sala 12 no existe, y aun así: ', 'Sobre el 000: ', 'Si el expediente se escribe solo: ', 'Continuidad pregunta: '],
+        4: ['', 'Sesión residual: ', 'Sin departamento listado: ', 'El cierre no cierra: ', 'Cuando termine de leer: ']
+      },
+      suffixes: {
+        1: ['', ' El identificador importa.', ' No invente fechas.'],
+        2: ['', ' Coincidencias no son consuelo.', ' El margen del archivo escucha.'],
+        3: ['', ' No mire la puerta.', ' No confirme si oye dos voces.'],
+        4: ['', ' No responda si pregunta por el lector.', ' El 000 sigue sin nombre.']
+      },
+      extra: {
+        1: [
+          { q: 'Identifíquese. Si no quiere, use un alias que pueda repetir.', tag: 'ID', key: 'name' },
+          { q: '¿Ha estado aquí antes, según usted?', tag: 'REPETICIÓN', key: 'before' },
+          { q: '¿Conoce la Sala 12?', tag: 'SALA', key: 'room' },
+          { q: '¿Qué significa para usted la palabra continuidad?', tag: 'GLOSARIO', key: 'cont' },
+          { q: '¿Sueña con entrevistas que no ha tenido?', tag: 'SUEÑO', key: 'dream' }
+        ],
+        2: [
+          { q: 'Si el registro mostrara que ya respondió esto, ¿lo negaría?', tag: 'REGISTRO', key: 'deny' },
+          { q: '¿Ha oído alguna vez una pregunta antes de leerla?', tag: 'ANTICIPO', key: 'anticipate' },
+          { q: '¿Le suena el identificador 000?', tag: 'SUJETO', key: 'zero' },
+          { q: '¿Confiaría en un expediente que cambia al abrirlo?', tag: 'NULL', key: 'null' }
+        ],
+        3: [
+          { q: 'Si te preguntan si estás solo, ¿responderías?', tag: 'ADENDA', key: 'alone' },
+          { q: '¿Quién autoriza los cierres de Continuidad?', tag: 'DEPTO', key: 'dept' },
+          { q: '¿Ha desaparecido alguien que conociera tras un cuestionario?', tag: 'CONTACTO', key: 'gone' },
+          { q: 'Cuando termine de leer… ¿qué cree que ocurre?', tag: 'SALA12', key: 'read' }
+        ],
+        4: [
+          { q: '¿Esta sesión es nueva o una que vuelve a comenzar?', tag: 'RESIDUAL', key: 'residual' },
+          { q: 'Escriba lo que no debería quedar en el archivo.', tag: 'SECRETO', key: 'secret' },
+          { q: '¿Quién está leyendo esto ahora mismo?', tag: 'LECTOR', key: 'final' }
+        ]
+      }
+    },
+    u04: {
+      prefixes: null, // usa los globales
+      suffixes: null,
+      extra: null
+    },
+    u05: {
+      prefixes: {
+        1: ['', '… ', 'si aún hay alguien: ', 'registro incompleto: ', 'sin operador: '],
+        2: ['', 'la sesión ya había empezado: ', 'no preguntes por el entrevistador: ', 'eco: '],
+        3: ['', '████: ', 'el expediente abierto: ', 'voz sin cuerpo: ', ' residual: '],
+        4: ['', 'no hay final: ', 'reinicio: ', 'sujeto/entrevistador confuso: ', '…']
+      },
+      suffixes: {
+        1: ['', ' …', ' si puedes.'],
+        2: ['', ' no confirmes tu nombre dos veces.', ' el archivo ya te tiene.'],
+        3: ['', ' no mires la silla vacía.', ' dos voces, una habitación.'],
+        4: ['', ' la sesión continúa activa.', ' gracias por participar. otra vez.']
+      },
+      extra: {
+        1: [
+          { q: '¿Cómo te llamas… esta vez?', tag: 'ID', key: 'name' },
+          { q: '¿Notas que esto ya ocurrió?', tag: 'LOOP', key: 'before' },
+          { q: '¿Hay alguien en la silla?', tag: 'SALA', key: 'chair' },
+          { q: '¿Quién habla, tú o el registro?', tag: 'VOZ', key: 'voice' }
+        ],
+        2: [
+          { q: 'La respuesta ya está escrita. ¿La cambias igual?', tag: 'PRE', key: 'pre' },
+          { q: '¿Desapareces si dejas de responder?', tag: 'EXIST', key: 'gone' },
+          { q: '000. ¿Te dice algo?', tag: 'CERO', key: 'zero' }
+        ],
+        3: [
+          { q: 'No leas la siguiente página. ¿La lees igual?', tag: 'NULL', key: 'null' },
+          { q: '¿Estás solo? (no respondas si el expediente te lo pide)', tag: 'ADENDA', key: 'alone' },
+          { q: '¿El entrevistador eres tú?', tag: 'ROL', key: 'role' }
+        ],
+        4: [
+          { q: 'Gracias por participar. Vamos a comenzar… ¿otra vez?', tag: 'REINICIO', key: 'final' },
+          { q: 'Escribe lo que el sistema no debería recordar.', tag: 'SECRETO', key: 'secret' },
+          { q: '¿Quién queda cuando los demás dejan de aparecer?', tag: '000', key: 'zero' }
+        ]
+      }
+    }
+  };
+
+  function pickSessionQuestions(pastMemories, count, unitId) {
     count = count || 20;
-    const pool = buildPool(pastMemories);
+    unitId = unitId || 'u04';
+    const pool = buildPool(pastMemories, unitId);
     const total = countPool(pool);
     const usedQ = new Set();
     const usedKeys = new Set(['name']); // name forced later
