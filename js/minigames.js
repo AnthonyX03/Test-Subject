@@ -139,16 +139,26 @@
       if (i >= seq.length) {
         phase = 'input';
         display.textContent = 'TU TURNO';
+        display.style.opacity = '1';
         return;
       }
       display.textContent = seq[i];
+      display.style.opacity = '1';
+      // resaltar botón correspondiente
+      const btns = pad.querySelectorAll('.mg-seq-btn');
+      btns.forEach(b => {
+        if (b.textContent === seq[i]) b.classList.add('flash');
+        else b.classList.remove('flash');
+      });
       setTimeout(() => {
+        display.style.opacity = '0.35';
         display.textContent = '·';
+        btns.forEach(b => b.classList.remove('flash'));
         i++;
-        setTimeout(flash, 280);
-      }, 550);
+        setTimeout(flash, 450);
+      }, 900);
     }
-    setTimeout(flash, 400);
+    setTimeout(flash, 700);
   }
 
   /** 4 DECRYPT — ordenar letras */

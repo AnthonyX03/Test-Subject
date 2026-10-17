@@ -5,7 +5,7 @@
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v7';
-const APP_VERSION = '8.1';
+const APP_VERSION = '8.3';
 
 function getUnitEndings() {
   const u = getActiveUnit();
@@ -274,25 +274,55 @@ function hideAudioGate() {
 function armAudioGate() {
   const g = $('audioGate');
   const btn = $('audioGateBtn');
-  // Si el audio ya está permitido y suena, no mostrar
-  if (music.calm && !music.calm.paused) {
+  initMusic();
+  // Intento silencioso: algunos navegadores permiten muted autoplay
+  try {
+    if (music.calm) {
+      music.calm.muted = true;
+      music.calm.volume = 0;
+      music.calm.play().then(() => {
+        // Ya hay elemento de audio activo; desmuteamos en el primer gesto global
+        hideAudioGate();
+        music.unlocked = true;
+        const unmute = () => {
+          if (!audioOn) return;
+          music.calm.muted = false;
+          music.calm.volume = getMusicVol();
+          music.current = music.calm;
+          document.removeEventListener('pointerdown', unmute, true);
+          document.removeEventListener('keydown', unmute, true);
+        };
+        document.addEventListener('pointerdown', unmute, { once: true, capture: true });
+        document.addEventListener('keydown', unmute, { once: true, capture: true });
+      }).catch(() => {
+        // Necesita gesto: mantener gate
+      });
+    }
+  } catch (e) {}
+
+  if (music.calm && !music.calm.paused && !music.calm.muted) {
     hideAudioGate();
     return;
   }
+
   function activate(ev) {
     if (ev) {
       try { ev.preventDefault(); } catch (e) {}
       try { ev.stopPropagation(); } catch (e) {}
     }
+    if (music.calm) {
+      music.calm.muted = false;
+      music.calm.volume = getMusicVol();
+    }
     startCalmInstant();
-    // Segundo intento tras un frame (algunos navegadores móviles)
     requestAnimationFrame(() => startCalmInstant());
     setTimeout(() => {
       if (music.calm && music.calm.paused) startCalmInstant();
-      else hideAudioGate();
     }, 120);
     hideAudioGate();
   }
+  // Cualquier toque en la página (no solo el gate) intenta arrancar
+  document.addEventListener('pointerdown', activate, { once: true, capture: true });
   if (g) {
     g.addEventListener('pointerdown', activate, { once: true });
     g.addEventListener('click', activate, { once: true });
@@ -491,7 +521,10 @@ function openEndingDetail(def) {
   const b = $('endingDetailBody');
   if (t) t.textContent = '◈ ' + (def.title || 'FINAL');
   if (b) b.textContent = getEndingLore(def);
-  if (m) m.classList.add('open');
+  if (m) {
+    m.classList.add('open');
+    m.style.zIndex = '55';
+  }
 }
 function closeEndingDetail() {
   const m = $('endingDetailModal');
@@ -1515,57 +1548,62 @@ function setSettingsTab(panelId) {
 
 
 
-function openShop() {
+let shopTab = 'docs';
+function openShop(tab) {
+  if (tab) shopTab = tab;
   updateCEUI();
   const list = $('shopList');
   if (!list) return;
   list.innerHTML = '';
 
-  const sec = (title) => {
-    const h = document.createElement('div');
-    h.className = 'shop-section-title';
-    h.textContent = title;
-    list.appendChild(h);
-  };
-
-  sec('DOCUMENTOS');
-  const shopDocs = (window.TSDocuments && TSDocuments.SHOP_DOCS) || [];
-  shopDocs.forEach(item => {
-    const doc = TSDocuments.getDoc(item.id);
-    if (!doc) return;
-    const owned = isDocUnlocked(item.id);
-    const div = document.createElement('div');
-    div.className = 'shop-item';
-    div.innerHTML = '<div class="dtitle">' + doc.title + '</div><div class="dcat">' + doc.cat + '</div>' +
-      '<div class="price">' + (owned ? 'YA EN ARCHIVO' : (item.price + ' CE')) + '</div>';
-    if (!owned) {
-      const btn = document.createElement('button');
-      btn.className = 'button';
-      btn.textContent = 'COMPRAR';
-      btn.style.marginTop = '8px';
-      btn.onclick = () => {
-        if ((saveData.ce || 0) < item.price) { showSysMsg('CE INSUFICIENTES', 2000, true); return; }
-        saveData.ce -= item.price;
-        unlockDocument(item.id, false);
-        persist();
-        updateCEUI();
-        openShop();
-        showSysMsg('DOCUMENTO ADQUIRIDO', 2000);
-      };
-      div.appendChild(btn);
-    }
-    list.appendChild(div);
+  const tabs = document.createElement('div');
+  tabs.className = 'shop-tabs';
+  tabs.innerHTML = '<button type="button" class="tab' + (shopTab==='docs'?' active':'') + '" data-t="docs">DOCUMENTOS</button>' +
+    '<button type="button" class="tab' + (shopTab==='units'?' active':'') + '" data-t="units">UNIDADES</button>';
+  tabs.querySelectorAll('.tab').forEach(b => {
+    b.onclick = () => openShop(b.dataset.t);
   });
+  list.appendChild(tabs);
 
-  sec('UNIDADES');
-  if (window.TSUnits) {
+  if (shopTab === 'docs') {
+    const shopDocs = (window.TSDocuments && TSDocuments.SHOP_DOCS) || [];
+    shopDocs.forEach(item => {
+      const doc = TSDocuments.getDoc(item.id);
+      if (!doc) return;
+      const owned = isDocUnlocked(item.id);
+      const div = document.createElement('div');
+      div.className = 'shop-item';
+      div.innerHTML = '<div class="dtitle">' + doc.title + '</div><div class="dcat">' + doc.cat + '</div>' +
+        '<div class="price">' + (owned ? 'YA EN ARCHIVO' : (item.price + ' CE')) + '</div>';
+      if (!owned) {
+        const btn = document.createElement('button');
+        btn.className = 'button';
+        btn.textContent = 'COMPRAR';
+        btn.style.marginTop = '8px';
+        btn.onclick = () => {
+          if ((saveData.ce || 0) < item.price) { showSysMsg('CE INSUFICIENTES', 2000, true); return; }
+          saveData.ce -= item.price;
+          unlockDocument(item.id, false);
+          persist();
+          updateCEUI();
+          openShop('docs');
+          showSysMsg('DOCUMENTO ADQUIRIDO', 2000);
+        };
+        div.appendChild(btn);
+      }
+      list.appendChild(div);
+    });
+  } else if (window.TSUnits) {
     TSUnits.listUnits().slice().sort((a,b)=>Number(a.code)-Number(b.code)).forEach(u => {
       if (u.id === 'u04') return;
       const owned = (saveData.unlockedUnits || []).includes(u.id);
+      const face = (u.face && u.face.calm) || { eyes: '• •', mouth: '﹀' };
+      const col = (u.colors && u.colors.green) || '#7dff9a';
       const div = document.createElement('div');
-      div.className = 'shop-item';
-      div.innerHTML = '<div class="dtitle">' + u.name + ' — ' + u.title + '</div><div class="dcat">' + u.shopBlurb + '</div>' +
-        '<div class="price">' + (owned ? 'DESBLOQUEADA' : (u.unlock + ' CE')) + '</div>';
+      div.className = 'shop-item unit-item';
+      div.innerHTML = '<div class="unit-face" style="border-color:' + col + ';color:' + col + '"><div class="uf-eyes">' + face.eyes + '</div><div>' + face.mouth + '</div></div>' +
+        '<div class="unit-body"><div class="dtitle">' + u.name + ' — ' + u.title + '</div><div class="dcat">' + u.shopBlurb + '</div>' +
+        '<div class="price">' + (owned ? 'DESBLOQUEADA' : (u.unlock + ' CE')) + '</div></div>';
       if (!owned) {
         const btn = document.createElement('button');
         btn.className = 'button';
@@ -1579,10 +1617,10 @@ function openShop() {
           persist();
           updateCEUI();
           refreshSupervisorBtn();
-          openShop();
+          openShop('units');
           showSysMsg(u.name + ' DISPONIBLE', 2200);
         };
-        div.appendChild(btn);
+        div.querySelector('.unit-body').appendChild(btn);
       }
       list.appendChild(div);
     });
@@ -1599,10 +1637,14 @@ function openUnits() {
   TSUnits.listUnits().slice().sort((a,b)=>Number(a.code)-Number(b.code)).forEach(u => {
     const owned = (saveData.unlockedUnits || ['u04']).includes(u.id);
     const active = saveData.activeUnit === u.id;
+    const face = (u.face && u.face.calm) || { eyes: '• •', mouth: '﹀' };
+    const col = (u.colors && u.colors.green) || '#7dff9a';
     const div = document.createElement('div');
     div.className = 'unit-item';
-    div.innerHTML = '<div class="dtitle">' + u.name + (active ? ' · ACTIVA' : '') + '</div>' +
-      '<div class="dcat">' + u.title + '</div><div class="price">' + (owned ? 'Disponible' : ('Bloqueada · ' + u.unlock + ' CE en tienda')) + '</div>';
+    div.innerHTML = '<div class="unit-face" style="border-color:' + col + ';color:' + col + ';opacity:' + (owned ? '1' : '.4') + '">' +
+      '<div class="uf-eyes">' + face.eyes + '</div><div>' + face.mouth + '</div></div>' +
+      '<div class="unit-body"><div class="dtitle">' + u.name + (active ? ' · ACTIVA' : '') + '</div>' +
+      '<div class="dcat">' + u.title + '</div><div class="price">' + (owned ? 'Disponible' : ('Bloqueada · ' + u.unlock + ' CE en tienda')) + '</div></div>';
     if (owned && !active) {
       const btn = document.createElement('button');
       btn.className = 'button';
@@ -1616,7 +1658,7 @@ function openUnits() {
         openUnits();
         showSysMsg(u.name + ' ACTIVA', 2000);
       };
-      div.appendChild(btn);
+      div.querySelector('.unit-body').appendChild(btn);
     }
     list.appendChild(div);
   });
@@ -1636,7 +1678,10 @@ function launchMinigame(opts) {
     const root = $('mgRoot');
     if (!ov || !root) { resolve(false); return; }
     ov.classList.add('open');
+    let finished = false;
     const done = (ok, ce, typeId) => {
+      if (finished) return;
+      finished = true;
       ov.classList.remove('open');
       root.innerHTML = '';
       minigameOpen = false;
@@ -1667,16 +1712,23 @@ function launchMinigame(opts) {
       }
       resolve(ok);
     };
+    const runType = (t) => {
+      t.run(root, (ok, ce) => done(ok, ce, t.id));
+      // Botón salir (siempre en práctica; también útil si se atora)
+      const abort = document.createElement('button');
+      abort.type = 'button';
+      abort.className = 'mg-abort';
+      abort.textContent = practice ? 'SALIR' : 'ABORTAR';
+      abort.onclick = () => done(false, 0, t.id);
+      root.style.position = 'relative';
+      root.appendChild(abort);
+    };
     if (forcedType) {
       const t = TSMinigames.TYPES.find(x => x.id === forcedType) || TSMinigames.TYPES[0];
-      t.run(root, (ok, ce) => done(ok, ce, t.id));
+      runType(t);
     } else {
-      const t = TSMinigames.startRandom(root, (ok, ce) => {
-        // startRandom doesn't pass type - track via closure
-      });
-      // re-call with known type
       const pick = TSMinigames.TYPES[Math.floor(Math.random() * TSMinigames.TYPES.length)];
-      pick.run(root, (ok, ce) => done(ok, ce, pick.id));
+      runType(pick);
     }
   });
 }
@@ -1808,12 +1860,41 @@ function playSupMusic(which) {
   try { next.play().catch(() => {}); } catch (e) {}
 }
 
+
 function showSupPhase(name) {
   ['supBriefPhase', 'supPlayPhase', 'supEndPhase'].forEach(id => {
     const el = $(id);
     if (el) el.style.display = id === name ? '' : 'none';
   });
 }
+
+function setSupFace(level) {
+  // level: calm | mid | horror
+  const faces = {
+    calm: { eyes: '◈ ◈', mouth: '─' },
+    mid: { eyes: '◉ ◉', mouth: '︵' },
+    horror: { eyes: '× ×', mouth: '⌁' }
+  };
+  const f = faces[level] || faces.calm;
+  ['Brief', 'Mini', 'End'].forEach(suf => {
+    const e = $('supEyes' + suf), m = $('supMouth' + suf);
+    if (e) e.textContent = f.eyes;
+    if (m) m.textContent = f.mouth;
+  });
+}
+
+function appendSupLog(logId, text, cls) {
+  const log = $(logId);
+  if (!log) return;
+  const line = document.createElement('div');
+  line.className = 'sup-chat-line ' + (cls || 'sup');
+  line.textContent = text;
+  log.appendChild(line);
+  // keep last ~12 lines
+  while (log.children.length > 12) log.removeChild(log.firstChild);
+  log.scrollTop = log.scrollHeight;
+}
+
 function enterSupervisorMode() {
   if (!allUnitsUnlocked()) {
     showSysMsg('REQUIERE TODAS LAS UNIDADES', 2500, true);
@@ -1824,69 +1905,129 @@ function enterSupervisorMode() {
   if (intro) intro.style.display = 'none';
   if (game) game.style.display = 'none';
   if (ending) { ending.classList.add('hidden'); ending.style.display = 'none'; }
-  if (sup) { sup.classList.add('active'); sup.style.display = 'flex'; }
+  if (sup) { sup.classList.add('active'); sup.style.display = 'flex'; sup.classList.remove('horror'); }
   supSession = 1;
   startSupBrief(1);
 }
+
 function exitSupervisorMode() {
   if (supRaf) cancelAnimationFrame(supRaf);
   supRaf = null;
   stopSupMusic();
   const sup = $('supScreen');
-  if (sup) { sup.classList.remove('active'); sup.style.display = 'none'; }
+  if (sup) { sup.classList.remove('active'); sup.classList.remove('horror'); sup.style.display = 'none'; }
   const intro = $('intro');
   if (intro) intro.style.display = '';
   if (audioOn) unlockAndStartCalm();
 }
-function startSupBrief(session) {
+
+async function startSupBrief(session) {
   supSession = session;
   showSupPhase('supBriefPhase');
-  const t = $('supBriefText');
-  const brief = (window.TSSupervisor && TSSupervisor.BRIEF[session]) || ('Sesión ' + session);
-  if (t) t.textContent = 'SUPERVISOR:\n\n' + brief + '\n\n«No dejes que te capturen. Si una unidad llega a la oficina con la puerta abierta, el expediente te marca como recuperado.»';
+  setSupFace('calm');
+  const log = $('supBriefLog');
+  if (log) log.innerHTML = '';
   playSupMusic('calm');
+  if (!window.TSSupervisor) return;
+  const intro = TSSupervisor.BRIEF_INTRO || [];
+  for (let i = 0; i < intro.length; i++) {
+    appendSupLog('supBriefLog', 'SUPERVISOR: ' + intro[i], 'sup');
+    await new Promise(r => setTimeout(r, 700));
+  }
+  const sess = TSSupervisor.BRIEF_SESSION[session] || ('Sesión ' + session);
+  appendSupLog('supBriefLog', 'SUPERVISOR: ' + sess, 'sup');
 }
+
+function buildSupMap() {
+  if (!window.TSSupervisor) return;
+  const edges = $('supEdges');
+  const nodes = $('supNodes');
+  if (edges) {
+    edges.innerHTML = '';
+    TSSupervisor.EDGES.forEach(([a, b]) => {
+      const A = TSSupervisor.NODES[a], B = TSSupervisor.NODES[b];
+      if (!A || !B) return;
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', A.x); line.setAttribute('y1', A.y);
+      line.setAttribute('x2', B.x); line.setAttribute('y2', B.y);
+      edges.appendChild(line);
+    });
+  }
+  if (nodes) {
+    nodes.innerHTML = '';
+    Object.keys(TSSupervisor.NODES).forEach(id => {
+      const n = TSSupervisor.NODES[id];
+      const el = document.createElement('div');
+      el.className = 'sup-node' + (id === 'oficina' ? ' you' : '');
+      el.style.left = n.x + '%';
+      el.style.top = n.y + '%';
+      el.textContent = n.label;
+      el.dataset.loc = id;
+      if (id !== 'oficina') {
+        el.onclick = () => {
+          if (!supState || !supState.camOpen) return;
+          supState.cam = id;
+          document.querySelectorAll('.sup-node').forEach(x => x.classList.remove('active-cam'));
+          el.classList.add('active-cam');
+          appendSupLog('supPlayLog', 'CAM → ' + n.label, 'sys');
+        };
+      }
+      nodes.appendChild(el);
+    });
+  }
+}
+
+function renderSupUnits() {
+  const layer = $('supUnitsLayer');
+  if (!layer || !supState) return;
+  Object.values(supState.units).forEach(u => {
+    let el = layer.querySelector('[data-uid="' + u.id + '"]');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'sup-unit';
+      el.dataset.uid = u.id;
+      const col = (u.face && u.face.color) || '#7dff9a';
+      el.style.color = col;
+      el.style.borderColor = col;
+      el.innerHTML = '<div class="u-eyes">' + ((u.face && u.face.eyes) || '• •') + '</div>' +
+        '<div class="u-mouth">' + ((u.face && u.face.mouth) || '─') + '</div>' +
+        '<div class="u-name">' + u.name + '</div>';
+      layer.appendChild(el);
+    }
+    el.style.left = u.x + '%';
+    el.style.top = u.y + '%';
+    // U05 half invisible
+    if (u.id === 'u05') el.style.opacity = (Math.random() > 0.35 || u.loc === 'oficina') ? '0.95' : '0.25';
+    else el.style.opacity = '1';
+  });
+}
+
 function startSupNight() {
   if (!window.TSSupervisor) return;
   supState = TSSupervisor.createState(supSession);
   showSupPhase('supPlayPhase');
-  // cámaras
-  const cams = $('supCams');
-  if (cams) {
-    cams.innerHTML = '';
-    TSSupervisor.LOCS.filter(l => l !== 'oficina').forEach(loc => {
-      const b = document.createElement('button');
-      b.className = 'button';
-      b.textContent = TSSupervisor.LOC_LABEL[loc] || loc;
-      b.onclick = () => {
-        if (!supState || !supState.camOpen) return;
-        supState.cam = loc;
-        renderSupCam();
-      };
-      cams.appendChild(b);
-    });
-  }
+  setSupFace('calm');
+  const playLog = $('supPlayLog');
+  if (playLog) playLog.innerHTML = '';
+  buildSupMap();
+  renderSupUnits();
   const doorBtn = $('supDoorBtn');
   if (doorBtn) doorBtn.textContent = 'CERRAR PUERTA';
-  supLast = performance.now();
+  const camBtn = $('supCamToggle');
+  if (camBtn) camBtn.textContent = 'CÁMARAS: OFF';
+  appendSupLog('supPlayLog', 'SUPERVISOR: Canal abierto. Escribe si necesitas algo… o no.', 'sup');
   playSupMusic('calm');
+  const wrap = $('supScreen');
+  if (wrap) wrap.classList.remove('horror');
+  supLast = performance.now();
+  supChatCooldown = 0;
+  supNearCooldown = 0;
   supLoop(supLast);
 }
-function renderSupCam() {
-  if (!supState || !window.TSSupervisor) return;
-  const v = TSSupervisor.camView(supState);
-  const el = $('supCamView');
-  if (!el) return;
-  if (!supState.camOpen) {
-    el.textContent = 'Panel de cámaras cerrado.';
-    return;
-  }
-  let txt = 'CAM · ' + v.label + '\n';
-  if (v.units.length) txt += 'Detectado: ' + v.units.join(', ');
-  else if (v.hint) txt += v.hint;
-  else txt += 'Sin movimiento aparente.';
-  el.textContent = txt;
-}
+
+let supChatCooldown = 0;
+let supNearCooldown = 0;
+
 function renderSupHud() {
   if (!supState) return;
   const ss = $('supSession');
@@ -1899,59 +2040,78 @@ function renderSupHud() {
   const pw = $('supPower');
   if (pw) pw.textContent = Math.max(0, Math.floor(supState.power)) + '%';
   const dl = $('supDoorLabel');
-  if (dl) dl.textContent = 'PUERTA: ' + (supState.doorClosed ? 'CERRADA' : 'ABIERTA');
-  // En oficina: si hay unidades rechazadas no se ve, si poder 0 aviso
-  const office = $('supOffice');
-  if (office && supState.power <= 0) {
-    office.style.borderColor = '#6a3030';
+  if (dl) {
+    dl.textContent = supState.doorClosed ? 'PUERTA CERRADA' : 'PUERTA ABIERTA';
+    dl.style.color = supState.doorClosed ? 'var(--green)' : 'var(--muted)';
   }
 }
+
 function supLoop(now) {
   if (!supState) return;
   const dt = Math.min(0.1, (now - supLast) / 1000);
   supLast = now;
-  // Música: primeros 3 min calm, luego horror
-  if (supState.timeLeft <= 180 && supMusic.current !== supMusic.horror) {
-    playSupMusic('horror');
-  }
+  supChatCooldown = Math.max(0, supChatCooldown - dt);
+  supNearCooldown = Math.max(0, supNearCooldown - dt);
+
+  const wasHorror = !!supState.horror;
   const watching = supState.camOpen;
   TSSupervisor.tick(supState, dt, watching);
+
+  if (supState.horror && !wasHorror) {
+    playSupMusic('horror');
+    const wrap = $('supScreen');
+    if (wrap) wrap.classList.add('horror');
+    setSupFace('horror');
+    appendSupLog('supPlayLog', 'SUPERVISOR: El canal se ensucia. A partir de aquí… improviso.', 'glitch');
+    sound('glitch');
+  }
+
+  // Avisos de cercanía
+  if (supNearCooldown <= 0 && TSSupervisor.anyoneNearDoor(supState) && Math.random() < 0.015) {
+    appendSupLog('supPlayLog', 'SUPERVISOR: ' + TSSupervisor.pickLine(supState, 'near'), supState.horror ? 'glitch' : 'sup');
+    setSupFace(supState.horror ? 'horror' : 'mid');
+    supNearCooldown = 8 + Math.random() * 6;
+  } else if (supNearCooldown <= 0 && Math.random() < 0.004) {
+    appendSupLog('supPlayLog', 'SUPERVISOR: ' + TSSupervisor.pickLine(supState, 'idle'), supState.horror ? 'glitch' : 'sys');
+    supNearCooldown = 12;
+  }
+
   renderSupHud();
-  if (supState.camOpen) renderSupCam();
-  if (supState.dead) {
-    endSupNight(false);
-    return;
-  }
-  if (supState.won) {
-    endSupNight(true);
-    return;
-  }
+  renderSupUnits();
+
+  if (supState.dead) { endSupNight(false); return; }
+  if (supState.won) { endSupNight(true); return; }
   supRaf = requestAnimationFrame(supLoop);
 }
+
 function endSupNight(won) {
   if (supRaf) cancelAnimationFrame(supRaf);
   supRaf = null;
   showSupPhase('supEndPhase');
+  setSupFace(won ? 'calm' : 'horror');
   const title = $('supEndTitle');
   const text = $('supEndText');
+  const next = $('supNext');
   if (won) {
     if (title) title.textContent = 'SESIÓN ' + supSession + ' SUPERADA';
     if (text) text.textContent = supSession >= 5
       ? 'Las cinco unidades fueron contenidas. El Supervisor cierra el terminal… por ahora. El archivo sigue abierto.'
-      : 'Aguantaste 6 minutos. Prepárate: en la siguiente sesión habrá una unidad más.';
-    const next = $('supNext');
-    if (next) next.style.display = supSession >= 5 ? 'none' : '';
+      : 'Aguantaste 6 minutos. En la siguiente sesión habrá una unidad más.';
+    if (next) { next.style.display = ''; next.textContent = supSession >= 5 ? 'CERRAR' : 'SIGUIENTE SESIÓN'; }
   } else {
     if (title) title.textContent = 'RECUPERADO';
     if (text) text.textContent = (supState && supState.killedBy ? supState.killedBy : 'Una unidad') +
-      ' alcanzó la oficina. El expediente te marca como sujeto recuperado. La sesión se reinicia.';
-    const next = $('supNext');
-    if (next) next.textContent = 'REINTENTAR SESIÓN';
-    if (next) next.style.display = '';
+      ' alcanzó la oficina. El expediente te marca como sujeto recuperado.';
+    if (next) { next.style.display = ''; next.textContent = 'REINTENTAR SESIÓN'; }
   }
   stopSupMusic();
 }
+
 function supContinue() {
+  if (supState && supState.won && supSession >= 5) {
+    exitSupervisorMode();
+    return;
+  }
   if (supState && supState.won && supSession < 5) {
     startSupBrief(supSession + 1);
   } else if (supState && !supState.won) {
@@ -1959,6 +2119,23 @@ function supContinue() {
   } else {
     exitSupervisorMode();
   }
+}
+
+function sendSupChat() {
+  const input = $('supChatInput');
+  if (!input || !supState) return;
+  const msg = (input.value || '').trim();
+  if (!msg) return;
+  input.value = '';
+  appendSupLog('supPlayLog', 'TÚ: ' + msg, 'you');
+  // respuesta del supervisor
+  setTimeout(() => {
+    if (!supState) return;
+    const line = TSSupervisor.pickLine(supState, 'reply');
+    appendSupLog('supPlayLog', 'SUPERVISOR: ' + line, supState.horror ? 'glitch' : 'sup');
+    setSupFace(supState.horror ? 'horror' : 'mid');
+    setTimeout(() => { if (supState && !supState.horror) setSupFace('calm'); }, 1200);
+  }, 400 + Math.random() * 500);
 }
 
 
@@ -1980,6 +2157,8 @@ function wireUI() {
   on($('supAbortPlay'), 'click', () => { if (supRaf) cancelAnimationFrame(supRaf); exitSupervisorMode(); });
   on($('supExit'), 'click', exitSupervisorMode);
   on($('supNext'), 'click', supContinue);
+  on($('supChatSend'), 'click', sendSupChat);
+  on($('supChatInput'), 'keydown', e => { if (e.key === 'Enter') sendSupChat(); });
   on($('supDoorBtn'), 'click', () => {
     if (!supState || supState.power <= 0) return;
     supState.doorClosed = !supState.doorClosed;
@@ -1991,7 +2170,7 @@ function wireUI() {
     if (!supState || supState.power <= 0) return;
     supState.camOpen = !supState.camOpen;
     const b = $('supCamToggle');
-    if (b) b.textContent = supState.camOpen ? 'CERRAR CÁMARAS' : 'CÁMARAS';
+    if (b) b.textContent = supState.camOpen ? 'CÁMARAS: ON' : 'CÁMARAS: OFF';
     renderSupCam();
   });
 
