@@ -175,7 +175,7 @@ body:not(.layout-pc) .topbar{font-size:9px}
 .speaker.tone-warm{color:#7aba80}
 
 
-.version-badge{position:fixed;bottom:10px;right:12px;font-size:10px;letter-spacing:.12em;color:#3a5a42;z-index:50;pointer-events:none;opacity:.85}
+.version-badge{position:fixed;bottom:10px;right:12px;font-size:10px;letter-spacing:.12em;color:#3a5a42;z-index:50;pointer-events:auto;opacity:.85;cursor:pointer;user-select:none}
 .modal .version-in{font-size:10px;letter-spacing:.14em;color:#4a6a52;margin-top:8px;text-align:right}
 
 .audio-gate{position:fixed;inset:0;z-index:60;background:#050806ee;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;cursor:pointer;transition:opacity .35s}
@@ -237,6 +237,22 @@ body:not(.layout-pc) .topbar{font-size:9px}
 .shop-item .price,.unit-item .price{color:#d4b86a;font-size:11px;letter-spacing:.1em}
 .ce-badge{font-size:10px;letter-spacing:.12em;color:#d4b86a}
 
+
+.creator-modal .modal{max-width:400px}
+.sup-screen{display:none;flex-direction:column;gap:10px;width:100%;max-width:720px;margin:0 auto}
+.sup-screen.active{display:flex}
+.sup-hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px;letter-spacing:.08em}
+.sup-hud strong{display:block;font-size:14px;color:var(--green,#7dff9a)}
+.sup-office{border:1px solid #2a4a32;background:#07100a;min-height:160px;padding:16px;text-align:center;position:relative}
+.sup-office .door-state{font-size:12px;margin-top:8px}
+.sup-cams{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.sup-cams button{font-size:10px;padding:8px 10px}
+.sup-view{border:1px solid #1d3b26;background:#050806;min-height:100px;padding:12px;font-size:12px;color:#8ab89a}
+.sup-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.sup-brief{white-space:pre-wrap;line-height:1.6;font-size:13px;color:#a8c8b0}
+#supervisorBtn{display:none;border-color:#6a3030;color:#ff9090}
+#supervisorBtn.show{display:inline-block}
+
 </style>
 </head>
 <body>
@@ -246,7 +262,7 @@ body:not(.layout-pc) .topbar{font-size:9px}
   <div class="ag-sub">El navegador bloquea el sonido hasta un toque. Después la música arranca sola.</div>
 </div>
 
-<div class="version-badge" id="versionBadge">v7.1</div>
+<div class="version-badge" id="versionBadge">v8.0</div>
 <div class="noise" id="noise"></div>
 <div class="scanline-extra" id="scanExtra"></div>
 <div class="vignette-pulse" id="vignette"></div>
@@ -313,7 +329,7 @@ body:not(.layout-pc) .topbar{font-size:9px}
       <div class="close-row">
         <button type="button" class="button" id="settingsClose">CERRAR</button>
       </div>
-      <p class="version-in" id="settingsVersion">v7.1</p>
+      <p class="version-in" id="settingsVersion">v8.0</p>
     </div>
   </div>
 </div>
@@ -451,6 +467,21 @@ body:not(.layout-pc) .topbar{font-size:9px}
 <div class="mg-overlay" id="mgOverlay">
   <div class="mg-box" id="mgRoot"></div>
 </div>
+
+<div class="modal-bg creator-modal" id="creatorModal" role="dialog">
+  <div class="modal">
+    <div class="modal-head"><h3>◈ ACCESO CREADOR</h3></div>
+    <div class="modal-body">
+      <p class="hint">Herramientas de desarrollo. Desbloquea todo el contenido local.</p>
+      <div class="row" style="flex-direction:column;gap:8px">
+        <button type="button" class="button" id="creatorUnlockAll">DESBLOQUEAR TODO</button>
+        <button type="button" class="button" id="creatorGiveCE">+500 CE</button>
+      </div>
+      <p class="hint" id="creatorStatus" style="margin-top:10px"></p>
+    </div>
+    <div class="modal-foot"><div class="close-row"><button type="button" class="button" id="creatorClose">CERRAR</button></div></div>
+  </div>
+</div>
 <main class="app">
   <header class="topbar">
     <div class="brand">◈ TEST SUBJECT</div>
@@ -487,6 +518,44 @@ body:not(.layout-pc) .topbar{font-size:9px}
       </p>
     </div>
 
+    
+    <div class="sup-screen" id="supScreen">
+      <div id="supBriefPhase">
+        <h2 style="letter-spacing:.14em;color:var(--green)">MODO SUPERVISOR</h2>
+        <p class="tiny">U.E.C. — Terminal de vigilancia · Acceso restringido</p>
+        <div class="sup-brief" id="supBriefText"></div>
+        <div class="controls" style="margin-top:16px">
+          <button class="button" id="supStartNight">INICIAR SESIÓN</button>
+          <button class="button" id="supAbortBrief">ABORTAR</button>
+        </div>
+      </div>
+      <div id="supPlayPhase" style="display:none">
+        <div class="sup-hud">
+          <div><small>SESIÓN</small><strong id="supSession">1/5</strong></div>
+          <div><small>TIEMPO</small><strong id="supTime">6:00</strong></div>
+          <div><small>ENERGÍA</small><strong id="supPower">100%</strong></div>
+        </div>
+        <div class="sup-office" id="supOffice">
+          <div>OFICINA · TERMINAL DE SUPERVISIÓN</div>
+          <div class="door-state" id="supDoorLabel">PUERTA: ABIERTA</div>
+        </div>
+        <div class="sup-view" id="supCamView">Cámara inactiva. Abre el panel.</div>
+        <div class="sup-cams" id="supCams"></div>
+        <div class="sup-actions">
+          <button class="button" id="supDoorBtn">CERRAR PUERTA</button>
+          <button class="button" id="supCamToggle">CÁMARAS</button>
+          <button class="button" id="supAbortPlay" style="border-color:#6a3030;color:#ff9090">ABORTAR</button>
+        </div>
+      </div>
+      <div id="supEndPhase" style="display:none;text-align:center">
+        <h2 id="supEndTitle">—</h2>
+        <p id="supEndText" class="sub"></p>
+        <div class="controls">
+          <button class="button" id="supNext">CONTINUAR</button>
+          <button class="button" id="supExit">SALIR AL MENÚ</button>
+        </div>
+      </div>
+    </div>
     <div class="game" id="game">
       <div class="hud">
         <div class="metric"><small>ESTADO DEL SISTEMA</small><strong id="sysValue">NORMAL</strong><div class="bar"><span id="sysBar"></span></div></div>
@@ -539,10 +608,11 @@ body:not(.layout-pc) .topbar{font-size:9px}
   </footer>
 </main>
 
-<script src="js/units.js?v=7.1"></script>
-<script src="js/minigames.js?v=7.1"></script>
-<script src="js/documents.js?v=7.1"></script>
-<script src="js/questions.js?v=7.1"></script>
-<script src="js/app.js?v=7.1"></script>
+<script src="js/units.js?v=8.0"></script>
+<script src="js/supervisor.js?v=8.0"></script>
+<script src="js/minigames.js?v=8.0"></script>
+<script src="js/documents.js?v=8.0"></script>
+<script src="js/questions.js?v=8.0"></script>
+<script src="js/app.js?v=8.0"></script>
 </body>
 </html>
