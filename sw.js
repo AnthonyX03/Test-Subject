@@ -1,5 +1,5 @@
-/* TEST SUBJECT — Service Worker v9.6 */
-const CACHE = 'ts-09-v9.6';
+/* TEST SUBJECT — Service Worker v1.0 */
+const CACHE = 'ts-09-v1.0';
 const ASSETS = [
   './',
   './index.html',

@@ -601,6 +601,26 @@ body{background:var(--bg)!important;color:var(--text)}
 .office-screen.active{display:flex}
 #officeLog{max-height:42vh;overflow-y:auto}
 
+
+.sup-door-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;width:100%}
+.sup-door-row .button{flex:1;min-width:140px;max-width:220px}
+.sup-tool-row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+.sup-tool-row .button{font-size:10px;padding:10px 12px}
+.sup-node.door-closed{border-color:#c04040!important;color:#ff9090!important}
+.sup-node.door-broken{border-color:#c9a227!important;color:#e8c44a!important;box-shadow:0 0 8px #c9a22744}
+.sup-node.scan-target{border-color:#4db8ff!important;color:#8ad4ff!important}
+.sup-node.cam-active{border-color:#c8a0ff!important;box-shadow:0 0 10px #c8a0ff44}
+.sup-comm .sup-chat-log{max-height:200px;min-height:100px}
+.sup-unit.hidden-unit{opacity:0.12!important;filter:blur(1px)}
+.sup-cam-preview{border:1px solid var(--border);background:#050806;padding:10px;min-height:70px;font-size:12px;text-align:center;color:var(--muted);margin:6px 0}
+.sup-tool-row .button.active-tool{border-color:var(--green);color:var(--green);box-shadow:0 0 10px #4d8b6044}
+
+
+.office-screen .entity{margin-bottom:4px}
+#officeLog .logline.user{color:var(--muted)}
+#officeLog .logline.system{color:var(--green)}
+.troop-card.in-deck{outline:1px solid color-mix(in srgb,var(--green) 40%,transparent)}
+
 </style>
 </head>
 <body>
@@ -610,7 +630,7 @@ body{background:var(--bg)!important;color:var(--text)}
   <div class="ag-sub">El navegador bloquea el sonido hasta un toque. Después la música arranca sola.</div>
 </div>
 
-<div class="version-badge" id="versionBadge">v9.6</div>
+<div class="version-badge" id="versionBadge">v1.0</div>
 <div class="noise" id="noise"></div>
 <div class="scanline-extra" id="scanExtra"></div>
 <div class="vignette-pulse" id="vignette"></div>
@@ -618,6 +638,17 @@ body{background:var(--bg)!important;color:var(--text)}
 <div class="sysmsg" id="sysmsg"></div>
 
 
+<div class="modal-bg" id="supAbortModal" role="dialog">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-head"><h3 style="color:#ff9090">⚠ ABORTAR SESIÓN</h3></div>
+    <div class="modal-body"><p class="hint">¿Seguro? La sesión actual se perderá.</p>
+      <div class="row">
+        <button type="button" class="button" id="supAbortYes" style="border-color:#6a3030;color:#ff9090;flex:1">CONFIRMAR</button>
+        <button type="button" class="button" id="supAbortNo" style="flex:1">CANCELAR</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="modal-bg" id="deptModal" role="dialog">
   <div class="modal" style="max-width:520px">
     <div class="modal-head"><h3>◈ DEPARTAMENTOS U.E.C.</h3></div>
@@ -715,7 +746,7 @@ body{background:var(--bg)!important;color:var(--text)}
       <div class="close-row">
         <button type="button" class="button" id="settingsClose">CERRAR</button>
       </div>
-      <p class="version-in" id="settingsVersion">v9.6</p>
+      <p class="version-in" id="settingsVersion">v1.0</p>
     </div>
   </div>
 </div>
@@ -980,7 +1011,7 @@ body{background:var(--bg)!important;color:var(--text)}
               <div class="troop-grid" id="contDeckList"></div>
             </div>
             <div>
-              <h4 class="cont-h4 muted">RESERVA <span class="tiny">(añadir)</span></h4>
+              <h4 class="cont-h4 muted">RESERVA <span class="tiny">(solo las que no están en el mazo)</span></h4>
               <div class="troop-grid" id="contReserveList"></div>
             </div>
           </div>
@@ -1098,9 +1129,17 @@ body{background:var(--bg)!important;color:var(--text)}
         </div>
 
         <div class="sup-actions">
-          <button class="button" id="supDoorABtn">PUERTA A · ABIERTA</button>
-          <button class="button" id="supDoorBBtn">PUERTA B · ABIERTA</button>
-          <button class="button" id="supAbortPlay" style="border-color:#6a3030;color:#ff9090">ABORTAR</button>
+          <div class="sup-door-row">
+            <button class="button" id="supDoorABtn">PUERTA A · ABIERTA</button>
+            <button class="button" id="supDoorBBtn">PUERTA B · ABIERTA</button>
+          </div>
+          <div class="sup-tool-row">
+            <button class="button" id="supScanBtn">ESCANEAR</button>
+            <button class="button" id="supCamBtn">CÁMARAS</button>
+            <button class="button" id="supVentBtn">CONDUCTOS</button>
+            <button class="button" id="supRepairBtn">REPARAR</button>
+          </div>
+          <p class="tiny" id="supStatusLine" style="text-align:center;margin:4px 0">Mapa principal · modo normal</p>
         </div>
 
         <div class="sup-comm" id="supComm">
@@ -1117,6 +1156,9 @@ body{background:var(--bg)!important;color:var(--text)}
             <input type="text" id="supChatInput" placeholder="Escribe al Supervisor…" maxlength="120" autocomplete="off">
             <button class="button" id="supChatSend">ENVIAR</button>
           </div>
+        </div>
+        <div class="controls" style="margin-top:10px">
+          <button class="button" id="supAbortPlay" style="border-color:#6a3030;color:#ff9090">ABORTAR SESIÓN</button>
         </div>
       </div>
 
@@ -1206,18 +1248,18 @@ body{background:var(--bg)!important;color:var(--text)}
   </section>
 
   <footer class="foot">
-    <span>ARCHIVO: TS-09 / BUILD 6.0</span>
+    <span>ARCHIVO: TS-09 / BUILD 1.0</span>
     <span id="footerHint">NO TODAS LAS PREGUNTAS SON PARA TI.</span>
   </footer>
 </main>
 
-<script src="js/cards.js?v=9.6"></script>
-<script src="js/contingency.js?v=9.6"></script>
-<script src="js/units.js?v=9.6"></script>
-<script src="js/supervisor.js?v=9.6"></script>
-<script src="js/minigames.js?v=9.6"></script>
-<script src="js/documents.js?v=9.6"></script>
-<script src="js/questions.js?v=9.6"></script>
-<script src="js/app.js?v=9.6"></script>
+<script src="js/cards.js?v=1.0"></script>
+<script src="js/contingency.js?v=1.0"></script>
+<script src="js/units.js?v=1.0"></script>
+<script src="js/supervisor.js?v=1.0"></script>
+<script src="js/minigames.js?v=1.0"></script>
+<script src="js/documents.js?v=1.0"></script>
+<script src="js/questions.js?v=1.0"></script>
+<script src="js/app.js?v=1.0"></script>
 </body>
 </html>
