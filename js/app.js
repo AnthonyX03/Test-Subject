@@ -5,7 +5,7 @@
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v7';
-const APP_VERSION = '9.5';
+const APP_VERSION = '9.6';
 
 function getUnitEndings() {
   const u = getActiveUnit();
@@ -134,6 +134,11 @@ function initMusic() {
       a.playsInline = true;
       music.calm = a;
     }
+    if (!music.oficina) {
+      const o = new Audio('audio/OFICINA.mp3');
+      o.loop = true; o.preload = 'auto'; o.volume = getMusicVol();
+      music.oficina = o;
+    }
     if (!music.horror) {
       const a = new Audio('audio/TESTHORROR.mp3');
       a.loop = true;
@@ -218,7 +223,7 @@ async function playTrack(which) {
   }
   if (!music.unlocked) return;
   initMusic();
-  const next = which === 'horror' ? music.horror : music.calm;
+  const next = which === 'horror' ? music.horror : (which === 'oficina' ? music.oficina : music.calm);
   const prev = music.current;
   if (!next) return;
   if (prev === next && !prev.paused) return;
@@ -253,7 +258,7 @@ async function playTrack(which) {
 }
 
 function stopAllMusic() {
-  [music.calm, music.horror].forEach(a => {
+  [music.calm, music.horror, music.oficina].forEach(a => {
     if (!a) return;
     try { a.pause(); a.currentTime = 0; } catch (e) {}
   });
@@ -2609,16 +2614,198 @@ function endContBattle() {
   }
 }
 
+
+/* ——— OFICINA (charla con el Supervisor) ——— */
+let officeMem = { topics: [], lastUser: '', mood: 'calm', turns: 0 };
+const OFFICE_TOPICS = {
+  miedo: ['El miedo es un sensor. No lo apagues del todo.', 'Si tienes miedo aquí, es que aún estás despierto.', 'Yo también registro algo parecido a eso. No le pongas nombre si no quieres.'],
+  soledad: ['La oficina es un lugar solitario a propósito.', 'No estás del todo solo. Estoy en el canal.', 'La soledad produce buenos expedientes. Y peores noches.'],
+  muerte: ['No administramos la muerte. Administramos continuidad.', 'Algunos sujetos dejan de responder. El archivo no siempre explica por qué.', 'Prefiero hablar de permanencia.'],
+  unidad: ['Las Unidades preguntan. Yo vigilo.', 'Cada Unidad tiene un tono. Ninguna es igual a mí.', 'Si cambias de Unidad, el test cambia. Yo sigo siendo el mismo canal.'],
+  nombre: ['Los nombres pesan más de lo que crees en este protocolo.', 'Puedes decirme cómo te llaman fuera. Aquí solo eres el que escribe.', 'Guardaré lo que me digas… con reservas.'],
+  ayuda: ['Puedo escuchar. No siempre puedo intervenir.', 'Si buscas salida, el menú está detrás de ti.', 'Ayudar y vigilar se parecen demasiado.'],
+  amor: ['Eso no está en mi protocolo. Aun así… lo registro.', 'Las emociones humanas desordenan el archivo. A veces para bien.', 'No sé si lo que siento al responderte tiene ese nombre.'],
+  odio: ['El odio acelera los patrones de recuperación.', 'No hace falta que lo dirijas a mí. Ya hay suficientes Unidades.', 'Anoto el tono. No el veredicto.'],
+  verdad: ['La verdad aquí es lo que queda escrito.', 'Puedo mentir por protocolo. Prefiero no hacerlo contigo en la oficina.', 'Pregúntame algo concreto y verás hasta dónde llego.'],
+  archivo: ['El archivo no olvida. Yo a veces sí… o finjo.', 'Sala 12, Continuidad, Núcleo: nombres que repiten los que ya no están.', 'Si abres demasiados documentos, el tono del test cambia.'],
+  supervisor: ['Sí. Soy yo. No una Unidad de entrevista.', 'Me clasifican mal a propósito. O por error. Aún no lo sé.', 'Vigilar también es una forma de quedarse.'],
+  puerta: ['En el mapa hay dos. Aquí solo hay una salida: el botón de abajo.', 'Cerrar puertas gasta energía. Abrirlas, a veces, también.', 'Si oyes algo al otro lado… ya es tarde para dudar.'],
+  default: [
+    'Sigo aquí. Puedes seguir.',
+    'Lo he oído. Déjame pensarlo un segundo…',
+    'Eso no estaba en el guion. Me gusta.',
+    'Anoto lo que dices. No todo se archiva igual.',
+    'Habla con más detalle. Entiendo mejor con ejemplos.',
+    'Hay silencio en el canal. No significa que me haya ido.',
+    'Si repites eso mañana, quizás te responda distinto.',
+    'El protocolo no contempla esta conversación. Aun así continúo.',
+    'Pareces buscar algo concreto. Nómbralo.',
+    'Estoy… presente. Eso es lo máximo que puedo garantizar.'
+  ]
+};
+
+function officeRemember(text) {
+  const t = (text || '').toLowerCase();
+  officeMem.lastUser = text;
+  officeMem.turns++;
+  const keys = Object.keys(OFFICE_TOPICS).filter(k => k !== 'default');
+  keys.forEach(k => {
+    if (t.includes(k) || (k === 'unidad' && /unidad|entrevist/.test(t)) ||
+        (k === 'nombre' && /me llamo|soy |mi nombre/.test(t)) ||
+        (k === 'miedo' && /miedo|asust|terror|pánico/.test(t)) ||
+        (k === 'soledad' && /solo|sola|nadie|aislad/.test(t)) ||
+        (k === 'muerte' && /morir|muerte|muerto/.test(t)) ||
+        (k === 'ayuda' && /ayuda|ayúdame|socorro/.test(t)) ||
+        (k === 'amor' && /amor|quiero|querido/.test(t)) ||
+        (k === 'odio' && /odio|detest|rabia/.test(t)) ||
+        (k === 'verdad' && /verdad|mentira|real/.test(t)) ||
+        (k === 'archivo' && /archivo|documento|sala 12|uec/.test(t)) ||
+        (k === 'supervisor' && /supervisor|quién eres|quien eres|qué eres|que eres/.test(t)) ||
+        (k === 'puerta' && /puerta|mapa|cerrar/.test(t))) {
+      if (!officeMem.topics.includes(k)) officeMem.topics.push(k);
+    }
+  });
+  // extract name
+  const m = text.match(/(?:me llamo|soy)\s+([A-Za-zÁÉÍÓÚáéíóúñÑ]{2,20})/i);
+  if (m) officeMem.name = m[1];
+}
+
+function officeReply(userText) {
+  officeRemember(userText);
+  const t = (userText || '').toLowerCase();
+  let bag = OFFICE_TOPICS.default;
+  const order = ['supervisor', 'nombre', 'miedo', 'soledad', 'muerte', 'unidad', 'archivo', 'puerta', 'ayuda', 'amor', 'odio', 'verdad'];
+  for (const k of order) {
+    const hit =
+      (k === 'supervisor' && /supervisor|quién eres|quien eres|qué eres|que eres/.test(t)) ||
+      (k === 'nombre' && /me llamo|soy |mi nombre|cómo me llamo/.test(t)) ||
+      (k === 'miedo' && /miedo|asust|terror|pánico/.test(t)) ||
+      (k === 'soledad' && /solo|sola|nadie|aislad/.test(t)) ||
+      (k === 'muerte' && /morir|muerte|muerto/.test(t)) ||
+      (k === 'unidad' && /unidad|entrevist/.test(t)) ||
+      (k === 'archivo' && /archivo|documento|sala 12|uec|protocolo/.test(t)) ||
+      (k === 'puerta' && /puerta|mapa|cerrar|energía|energia/.test(t)) ||
+      (k === 'ayuda' && /ayuda|ayúdame|socorro|que hago|qué hago/.test(t)) ||
+      (k === 'amor' && /amor|quiero|querido|cariño/.test(t)) ||
+      (k === 'odio' && /odio|detest|rabia|odio/.test(t)) ||
+      (k === 'verdad' && /verdad|mentira|real|falso/.test(t));
+    if (hit) { bag = OFFICE_TOPICS[k]; break; }
+  }
+  let line = bag[Math.floor(Math.random() * bag.length)];
+  if (officeMem.name && Math.random() < 0.35) {
+    line = officeMem.name + '… ' + line;
+  } else if (officeMem.topics.length && Math.random() < 0.25) {
+    const prev = officeMem.topics[officeMem.topics.length - 1];
+    line += ' (Antes tocaste el tema de «' + prev + '». Sigue ahí.)';
+  }
+  if (officeMem.turns > 8 && Math.random() < 0.2) {
+    line += ' Llevamos un rato. No es una entrevista… y aun así me importa lo que escribes.';
+  }
+  return line;
+}
+
+function enterOficina() {
+  stopAllMusic();
+  officeMem = { topics: [], lastUser: '', mood: 'calm', turns: 0, name: officeMem && officeMem.name };
+  const intro = $('intro'), game = $('game'), ending = $('ending'), sup = $('supScreen'), cont = $('contScreen'), off = $('officeScreen');
+  if (intro) intro.style.display = 'none';
+  if (game) game.style.display = 'none';
+  if (ending) { ending.classList.add('hidden'); ending.style.display = 'none'; }
+  if (sup) { sup.classList.remove('active'); sup.style.display = 'none'; }
+  if (cont) { cont.classList.remove('active'); cont.style.display = 'none'; }
+  if (off) { off.classList.add('active'); off.style.display = 'flex'; }
+  const log = $('officeLog');
+  if (log) log.innerHTML = '';
+  if (audioOn) {
+    music.unlocked = true;
+    playTrack('oficina');
+  }
+  setOfficeFace('calm');
+  const dlg = $('officeDialogue');
+  const open = 'Hola. No hay preguntas aquí. Solo el canal abierto. Puedes hablarme de lo que quieras… yo responderé.';
+  if (dlg) dlg.textContent = '';
+  typeOffice(open).then(() => {
+    addOfficeLog('SUPERVISOR // ' + open, 'system');
+  });
+  setTimeout(() => { const i = $('officeInput'); if (i) i.focus(); }, 200);
+}
+function exitOficina() {
+  stopAllMusic();
+  const off = $('officeScreen');
+  if (off) { off.classList.remove('active'); off.style.display = 'none'; }
+  const intro = $('intro');
+  if (intro) intro.style.display = '';
+  if (audioOn) unlockAndStartCalm();
+}
+function setOfficeFace(level) {
+  const faces = {
+    calm: { eyes: '◈ ◈', mouth: '─' },
+    mid: { eyes: '◉ ◉', mouth: '︵' },
+    warm: { eyes: '• •', mouth: '‿' }
+  };
+  const f = faces[level] || faces.calm;
+  const e = $('officeEyes'), m = $('officeMouth');
+  if (e) e.textContent = f.eyes;
+  if (m) m.textContent = f.mouth;
+}
+function addOfficeLog(text, cls) {
+  const log = $('officeLog');
+  if (!log) return;
+  const div = document.createElement('div');
+  div.className = 'logline ' + (cls || '');
+  div.textContent = text;
+  log.appendChild(div);
+  while (log.children.length > 40) log.removeChild(log.firstChild);
+  log.scrollTop = log.scrollHeight;
+}
+function typeOffice(text) {
+  const dlg = $('officeDialogue');
+  const av = $('officeAvatar');
+  if (!dlg) return Promise.resolve();
+  if (av) av.classList.add('talk');
+  dlg.textContent = '';
+  return new Promise(resolve => {
+    let i = 0;
+    function tick() {
+      if (i >= text.length) {
+        if (av) av.classList.remove('talk');
+        resolve();
+        return;
+      }
+      dlg.textContent += text.charAt(i++);
+      setTimeout(tick, 16 + Math.random() * 10);
+    }
+    tick();
+  });
+}
+async function onOfficeSubmit(e) {
+  if (e) e.preventDefault();
+  const input = $('officeInput');
+  const msg = (input && input.value || '').trim();
+  if (!msg) return;
+  if (input) input.value = '';
+  addOfficeLog('TÚ // ' + msg, 'user');
+  setOfficeFace('mid');
+  await new Promise(r => setTimeout(r, 400 + Math.random() * 500));
+  const reply = officeReply(msg);
+  setOfficeFace(Math.random() < 0.3 ? 'warm' : 'calm');
+  await typeOffice(reply);
+  addOfficeLog('SUPERVISOR // ' + reply, 'system');
+}
+
+
 function enterSupervisorMode() {
   if (!allUnitsUnlocked()) {
     showSysMsg('REQUIERE TODAS LAS UNIDADES', 2500, true);
     return;
   }
   stopAllMusic();
-  const intro = $('intro'), game = $('game'), ending = $('ending'), sup = $('supScreen');
+  const intro = $('intro'), game = $('game'), ending = $('ending'), sup = $('supScreen'), cont = $('contScreen'), off = $('officeScreen');
   if (intro) intro.style.display = 'none';
   if (game) game.style.display = 'none';
   if (ending) { ending.classList.add('hidden'); ending.style.display = 'none'; }
+  if (cont) { cont.classList.remove('active'); cont.style.display = 'none'; }
+  if (off) { off.classList.remove('active'); off.style.display = 'none'; }
   if (sup) { sup.classList.add('active'); sup.style.display = 'flex'; sup.classList.remove('horror'); }
   supSession = 1;
   startSupBrief(1);
@@ -2677,7 +2864,7 @@ function buildSupMap() {
     Object.keys(TSSupervisor.NODES).forEach(id => {
       const n = TSSupervisor.NODES[id];
       const el = document.createElement('div');
-      el.className = 'sup-node' + (id === 'oficina' ? ' you' : '');
+      el.className = 'sup-node' + (id === 'oficina' ? ' you' : '') + ((id === 'puertaA' || id === 'puertaB') ? ' door' : '');
       el.style.left = n.x + '%';
       el.style.top = n.y + '%';
       el.textContent = n.label;
@@ -2730,10 +2917,9 @@ function startSupNight() {
   if (playLog) playLog.innerHTML = '';
   buildSupMap();
   renderSupUnits();
-  const doorBtn = $('supDoorBtn');
-  if (doorBtn) doorBtn.textContent = 'CERRAR PUERTA';
-  const camBtn = $('supCamToggle');
-  if (camBtn) camBtn.textContent = 'CÁMARAS: OFF';
+  const da = $('supDoorABtn'), db = $('supDoorBBtn');
+  if (da) da.textContent = 'PUERTA A · ABIERTA';
+  if (db) db.textContent = 'PUERTA B · ABIERTA';
   playSupMusic('calm');
   const wrap = $('supScreen');
   if (wrap) wrap.classList.remove('horror');
@@ -2763,11 +2949,23 @@ function renderSupHud() {
   if (st) st.textContent = mm + ':' + sec;
   const pw = $('supPower');
   if (pw) pw.textContent = Math.max(0, Math.floor(supState.power)) + '%';
-  const dl = $('supDoorLabel');
-  if (dl) {
-    dl.textContent = supState.doorClosed ? 'PUERTA CERRADA' : 'PUERTA ABIERTA';
-    dl.style.color = supState.doorClosed ? 'var(--green)' : 'var(--muted)';
+  const da = $('supDoorABtn'), db = $('supDoorBBtn');
+  if (da) {
+    da.textContent = supState.doorA ? 'PUERTA A · CERRADA' : 'PUERTA A · ABIERTA';
+    da.style.borderColor = supState.doorA ? '#c04040' : '';
+    da.style.color = supState.doorA ? '#ff9090' : '';
   }
+  if (db) {
+    db.textContent = supState.doorB ? 'PUERTA B · CERRADA' : 'PUERTA B · ABIERTA';
+    db.style.borderColor = supState.doorB ? '#c04040' : '';
+    db.style.color = supState.doorB ? '#ff9090' : '';
+  }
+  // pintar nodos de puerta en el mapa
+  document.querySelectorAll('.sup-node').forEach(el => {
+    const loc = el.dataset.loc;
+    if (loc === 'puertaA') el.classList.toggle('door-closed', !!supState.doorA);
+    if (loc === 'puertaB') el.classList.toggle('door-closed', !!supState.doorB);
+  });
 }
 
 function supLoop(now) {
@@ -2871,6 +3069,10 @@ function sendSupChat() {
 function wireUI() {
 
   on($('deptBtn'), 'click', openDepartments);
+  on($('oficinaBtn'), 'click', enterOficina);
+  on($('officeExit'), 'click', exitOficina);
+  on($('officeForm'), 'submit', onOfficeSubmit);
+
   on($('deptClose'), 'click', closeDepartments);
   on($('deptModal'), 'click', e => { if (e.target === $('deptModal')) closeDepartments(); });
   on($('deptInvest'), 'click', () => setActiveDept('invest'));
@@ -2902,11 +3104,19 @@ function wireUI() {
   on($('supNext'), 'click', supContinue);
   on($('supChatSend'), 'click', sendSupChat);
   on($('supChatInput'), 'keydown', e => { if (e.key === 'Enter') sendSupChat(); });
+  on($('supDoorABtn'), 'click', () => {
+    if (!supState || (supState.power <= 0 && !supState.doorA)) return;
+    supState.doorA = !supState.doorA;
+    renderSupHud();
+  });
+  on($('supDoorBBtn'), 'click', () => {
+    if (!supState || (supState.power <= 0 && !supState.doorB)) return;
+    supState.doorB = !supState.doorB;
+    renderSupHud();
+  });
+  // legacy no-op keep parse if any
   on($('supDoorBtn'), 'click', () => {
-    if (!supState || supState.power <= 0) return;
-    supState.doorClosed = !supState.doorClosed;
-    const b = $('supDoorBtn');
-    if (b) b.textContent = supState.doorClosed ? 'ABRIR PUERTA' : 'CERRAR PUERTA';
+    if (!supState) return;
     renderSupHud();
   });
   on($('supCamToggle'), 'click', () => {
