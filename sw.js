@@ -1,5 +1,5 @@
-/* TEST SUBJECT — Service Worker v9.5 */
-const CACHE = 'ts-09-v9.5';
+/* TEST SUBJECT — Service Worker v9.6 */
+const CACHE = 'ts-09-v9.6';
 const ASSETS = [
   './',
   './index.html',
@@ -16,6 +16,7 @@ const ASSETS = [
   './js/app.js',
   './audio/TEST.mp3',
   './audio/TESTHORROR.mp3',
+  './audio/OFICINA.mp3',
   './icons/favicon-16.png',
   './icons/favicon-32.png',
   './icons/icon-48.png',
