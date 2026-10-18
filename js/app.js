@@ -5,7 +5,7 @@
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v7';
-const APP_VERSION = '1.2';
+const APP_VERSION = '1.3';
 
 function getUnitEndings() {
   const u = getActiveUnit();
@@ -3058,13 +3058,13 @@ function updateSupToolsUI() {
     if (!b) return;
     b.classList.remove('active-tool');
   });
-  if (supState.mode === 'scan' && $('supScanBtn')) $('supScanBtn').classList.add('active-tool');
+  if (supState.scanning && $('supScanBtn')) $('supScanBtn').classList.add('active-tool');
   if (supState.mode === 'cam' && $('supCamBtn')) $('supCamBtn').classList.add('active-tool');
   if (supState.mapLayer === 'vent' && $('supVentBtn')) $('supVentBtn').classList.add('active-tool');
   const st = $('supStatusLine');
   if (st) {
     let t = (supState.mapLayer === 'vent' ? 'Conductos' : 'Mapa principal');
-    if (supState.scanning || supState.mode === 'scan') t += ' · ESCÁNER ON (gasta energía)';
+    if (supState.scanning) t += ' · ESCÁNER ON';
     if (supState.mode === 'cam') t += ' · elige cámara';
     if (supState.powerBroken) t += ' · ENERGÍA EN FALLO';
     st.textContent = t;
@@ -3072,21 +3072,34 @@ function updateSupToolsUI() {
 }
 
 
+function setScanner(on, log) {
+  if (!supState) return;
+  const next = !!on;
+  if (supState.scanning === next) return; // evita spam ON/ON
+  supState.scanning = next;
+  if (!next && supState.mode === 'scan') supState.mode = 'none';
+  if (log) appendSupLog('supPlayLog', next ? 'Escáner ON.' : 'Escáner OFF.', 'sys');
+  updateSupToolsUI();
+  renderSupUnits();
+  renderSupHud();
+}
+function isScanOn() {
+  return !!(supState && supState.scanning);
+}
 function renderSupUnits() {
   const layer = $('supUnitsLayer');
   if (!layer || !supState) return;
-  const scanOn = !!(supState.scanning || supState.mode === 'scan');
-  // sin escáner: no se ven unidades en el mapa
-  if (!scanOn) {
+  if (!isScanOn()) {
     layer.innerHTML = '';
     return;
   }
+  // quitar las que no tocan
   layer.querySelectorAll('.sup-unit').forEach(el => {
-    const id = el.dataset.uid;
-    const u = supState.units[id];
+    const u = supState.units[el.dataset.uid];
     if (!u || u.layer !== supState.mapLayer) el.remove();
   });
   Object.values(supState.units).forEach(u => {
+    // Solo capa actual. En conductos = mapa conductos.
     if (u.layer !== supState.mapLayer) return;
     let el = layer.querySelector('[data-uid="' + u.id + '"]');
     if (!el) {
@@ -3096,6 +3109,7 @@ function renderSupUnits() {
       const col = (u.face && u.face.color) || '#7dff9a';
       el.style.color = col;
       el.style.borderColor = col;
+      el.style.boxShadow = '0 0 10px ' + col;
       el.innerHTML = '<div class="u-eyes">' + ((u.face && u.face.eyes) || '• •') + '</div>' +
         '<div class="u-mouth">' + ((u.face && u.face.mouth) || '─') + '</div>' +
         '<div class="u-name">' + u.name + '</div>';
@@ -3103,20 +3117,19 @@ function renderSupUnits() {
     }
     el.style.left = u.x + '%';
     el.style.top = u.y + '%';
-    // ocultos: casi invisibles salvo que el escáner esté ON (ya lo está)
-    if (u.hidden) {
-      el.style.opacity = '0.35';
-      el.classList.add('hidden-unit');
-    } else {
-      el.classList.remove('hidden-unit');
-      el.style.opacity = u.id === 'u05' ? '0.55' : '1';
-    }
+    // Opacidad plena en la capa actual. Transparencia solo si está en conductos
+    // y el jugador mira el mapa principal (no se dibuja aquí).
+    // Si mapa = conductos, iconos claros.
+    el.style.opacity = '1';
+    el.classList.remove('hidden-unit');
   });
 }
 
 function startSupNight() {
   if (!window.TSSupervisor) return;
   supState = TSSupervisor.createState(supSession);
+  supState.scanning = false;
+  supState.mode = 'none';
   showSupPhase('supPlayPhase');
   setSupFace('calm');
   const playLog = $('supPlayLog');
@@ -3208,8 +3221,17 @@ function supLoop(now) {
   supChatCooldown = Math.max(0, supChatCooldown - dt);
   supNearCooldown = Math.max(0, supNearCooldown - dt);
 
-  const watching = false; // mapa siempre visible; sin panel de cámaras
-  TSSupervisor.tick(supState, dt, watching);
+  TSSupervisor.tick(supState, dt);
+
+  // Escáner continuo: gasta energía; al agotarse se apaga una sola vez
+  if (supState.scanning) {
+    if (supState.powerBroken || supState.power <= 0) {
+      setScanner(false, true);
+    } else {
+      supState.power = Math.max(0, supState.power - dt * 3.8);
+      if (supState.power <= 0) setScanner(false, true);
+    }
+  }
 
   // Mal rollo Supervisor: exactamente a 3:00 restantes — música + visual juntos
   if (!supHorrorLatched && supState.timeLeft <= 180) {
@@ -3385,22 +3407,20 @@ function wireUI() {
   });
   on($('supScanBtn'), 'click', () => {
     if (!supState || supState.repairing) return;
+    if (supState._scanLock) return;
+    supState._scanLock = true;
+    setTimeout(() => { if (supState) supState._scanLock = false; }, 350);
     closeSupCamView();
-    if (supState.mode === 'scan') {
-      supState.mode = 'none';
-      supState.scanning = false;
-      appendSupLog('supPlayLog', 'Escáner OFF.', 'sys');
+    if (supState.mode === 'cam') supState.mode = 'none';
+    if (supState.scanning) {
+      setScanner(false, true);
     } else {
       if (supState.powerBroken || supState.power <= 0) {
         showSysMsg('SIN ENERGÍA PARA ESCÁNER', 1800, true);
         return;
       }
-      supState.mode = 'scan';
-      supState.scanning = true;
-      appendSupLog('supPlayLog', 'Escáner ON · unidades visibles · gasta energía.', 'sys');
+      setScanner(true, true);
     }
-    updateSupToolsUI();
-    renderSupUnits();
   });
   on($('supCamBtn'), 'click', () => {
     if (!supState || supState.repairing) return;
