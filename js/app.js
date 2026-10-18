@@ -5,7 +5,7 @@
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v7';
-const APP_VERSION = '9.9';
+const APP_VERSION = '1.1';
 
 function getUnitEndings() {
   const u = getActiveUnit();
@@ -2186,8 +2186,8 @@ function appendSupLog(logId, text, cls) {
   line.className = 'sup-chat-line ' + (cls || 'sup');
   line.textContent = text;
   log.appendChild(line);
-  while (log.children.length > 14) log.removeChild(log.firstChild);
-  log.scrollTop = log.scrollHeight;
+  const max = (logId === 'supPlayLog') ? 5 : 10;
+  while (log.children.length > max) log.removeChild(log.firstChild);
   return line;
 }
 function setSupTalking(on) {
@@ -2927,34 +2927,136 @@ function buildSupMap() {
   }
 }
 function onSupNodeClick(id, label) {
-  if (!supState) return;
-  if (id === 'puertaC' && supState.mode === 'none') {
-    if (supState.doorCBroken) { showSysMsg('CONDUCTO EN FALLO — REPARA', 1800, true); return; }
-    if (supState.powerBroken) { showSysMsg('ENERGÍA EN FALLO', 1800, true); return; }
-    if (supState.power <= 0 && !supState.doorC) return;
-    supState.doorC = !supState.doorC;
-    appendSupLog('supPlayLog', supState.doorC ? 'CONDUCTO cerrado.' : 'CONDUCTO abierto.', 'sys');
-    renderSupHud();
-    return;
-  }
+  if (!supState || supState.repairing) return;
   if (supState.mode === 'scan') {
     supState.scanRoom = id;
-    supState.scanTimer = 4;
+    supState.scanTimer = 3.5;
     supState.mode = 'none';
-    appendSupLog('supPlayLog', 'ESCANEO → ' + label + ' (4s)', 'sys');
+    const here = Object.values(supState.units).filter(u => u.loc === id && u.layer === supState.mapLayer);
+    const tip = here.length ? ('señal: ' + here.map(u => u.name).join(', ')) : 'sin señal clara';
+    appendSupLog('supPlayLog', 'ESCANEO → ' + label + ' · ' + tip, 'sys');
     updateSupToolsUI();
     return;
   }
   if (supState.mode === 'cam') {
-    supState.camRoom = id;
-    const here = Object.values(supState.units).filter(u => u.loc === id && u.layer === supState.mapLayer);
-    const names = here.map(u => u.name + (u.hidden ? ' (oculto)' : '')).join(', ') || 'vacío';
-    appendSupLog('supPlayLog', 'CÁMARA ' + label + ' → ' + names, 'sys');
-    const prev = $('supCamPreview');
-    if (prev) prev.textContent = 'CAM ' + label + ': ' + names;
-    updateSupToolsUI();
+    openSupCamView(id, label);
   }
 }
+function openSupCamView(id, label) {
+  if (!supState) return;
+  supState.camRoom = id;
+  const map = $('supMapWrap');
+  const view = $('supCamView');
+  if (map) map.style.display = 'none';
+  if (view) view.style.display = '';
+  const title = $('supCamTitle');
+  if (title) title.textContent = 'CÁMARA · ' + label;
+  const here = Object.values(supState.units).filter(u => u.loc === id && u.layer === supState.mapLayer);
+  const eyes = $('supCamEyes'), mouth = $('supCamMouth'), face = $('supCamFace'), text = $('supCamText');
+  if (here.length) {
+    const u = here[0];
+    const col = (u.face && u.face.color) || '#7dff9a';
+    if (face) { face.style.borderColor = col; face.style.color = col; }
+    if (eyes) eyes.textContent = (u.face && u.face.eyes) || '• •';
+    if (mouth) mouth.textContent = (u.face && u.face.mouth) || '─';
+    if (text) text.textContent = u.name + (u.hidden ? ' · oculto en zona' : ' · presente');
+    if (here.length > 1 && text) text.textContent += ' (+' + (here.length - 1) + ')';
+  } else {
+    if (face) { face.style.borderColor = ''; face.style.color = ''; }
+    if (eyes) eyes.textContent = '· ·';
+    if (mouth) mouth.textContent = '─';
+    if (text) text.textContent = 'Vacío. Nada en el marco.';
+  }
+  appendSupLog('supPlayLog', 'CÁMARA ' + label, 'sys');
+  updateSupToolsUI();
+}
+function closeSupCamView() {
+  const map = $('supMapWrap');
+  const view = $('supCamView');
+  if (view) view.style.display = 'none';
+  if (map) map.style.display = '';
+  if (supState) supState.mode = 'none';
+  updateSupToolsUI();
+}
+function updateDoorButtonsVisibility() {
+  const main = $('supDoorRowMain');
+  const vent = $('supDoorRowVent');
+  if (!supState) return;
+  if (supState.mapLayer === 'vent') {
+    if (main) main.style.display = 'none';
+    if (vent) vent.style.display = 'flex';
+  } else {
+    if (main) main.style.display = 'flex';
+    if (vent) vent.style.display = 'none';
+  }
+}
+
+
+function openSupRepairMenu() {
+  if (!supState || supState.repairing) return;
+  const opts = [
+    ['repDoorA', supState.doorABroken],
+    ['repDoorB', supState.doorBBroken],
+    ['repDoorC', supState.doorCBroken],
+    ['repPower', supState.powerBroken]
+  ];
+  opts.forEach(([id, broken]) => {
+    const b = $(id);
+    if (!b) return;
+    b.classList.toggle('broken', !!broken);
+    b.disabled = !broken;
+  });
+  const prog = $('supRepairProgress');
+  if (prog) prog.style.display = 'none';
+  const m = $('supRepairModal');
+  if (m) m.classList.add('open');
+}
+function startRepair(what, label) {
+  if (!supState || supState.repairing) return;
+  const broken =
+    (what === 'doorA' && supState.doorABroken) ||
+    (what === 'doorB' && supState.doorBBroken) ||
+    (what === 'doorC' && supState.doorCBroken) ||
+    (what === 'power' && supState.powerBroken);
+  if (!broken) return;
+  supState.repairing = true;
+  const play = $('supPlayPhase');
+  if (play) play.classList.add('sup-play-locked');
+  const prog = $('supRepairProgress');
+  const fill = $('supRepairFill');
+  const pct = $('supRepairPct');
+  const lab = $('supRepairLabel');
+  if (prog) prog.style.display = '';
+  if (lab) lab.textContent = 'Reparando ' + label + '…';
+  // deshabilitar opciones
+  ['repDoorA','repDoorB','repDoorC','repPower','supRepairClose'].forEach(id => {
+    const b = $(id); if (b) b.disabled = true;
+  });
+  let p = 0;
+  const duration = 2800 + Math.random() * 1200;
+  const t0 = performance.now();
+  function step(now) {
+    p = Math.min(100, ((now - t0) / duration) * 100);
+    if (fill) fill.style.width = p + '%';
+    if (pct) pct.textContent = Math.floor(p) + '%';
+    if (p < 100) {
+      requestAnimationFrame(step);
+    } else {
+      TSSupervisor.repair(supState, what);
+      supState.repairing = false;
+      if (play) play.classList.remove('sup-play-locked');
+      appendSupLog('supPlayLog', label + ' reparado.', 'sys');
+      ['repDoorA','repDoorB','repDoorC','repPower','supRepairClose'].forEach(id => {
+        const b = $(id); if (b) b.disabled = false;
+      });
+      const m = $('supRepairModal');
+      if (m) m.classList.remove('open');
+      renderSupHud();
+    }
+  }
+  requestAnimationFrame(step);
+}
+
 function updateSupToolsUI() {
   if (!supState) return;
   ['supScanBtn','supCamBtn','supVentBtn'].forEach(id => {
@@ -3032,15 +3134,9 @@ function startSupNight() {
   const da = $('supDoorABtn'), db = $('supDoorBBtn');
   if (da) { da.textContent = 'PUERTA A · ABIERTA'; da.style.borderColor = ''; da.style.color = ''; }
   if (db) { db.textContent = 'PUERTA B · ABIERTA'; db.style.borderColor = ''; db.style.color = ''; }
-  let prev = $('supCamPreview');
-  if (!prev) {
-    prev = document.createElement('div');
-    prev.id = 'supCamPreview';
-    prev.className = 'sup-cam-preview';
-    prev.textContent = 'Cámara: —';
-    const map = $('supMapWrap');
-    if (map && map.parentNode) map.parentNode.insertBefore(prev, map.nextSibling);
-  }
+  const oldPrev = $('supCamPreview');
+  if (oldPrev) oldPrev.style.display = 'none';
+  closeSupCamView();
   playSupMusic('calm');
   const wrap = $('supScreen');
   if (wrap) wrap.classList.remove('horror');
@@ -3068,27 +3164,25 @@ function renderSupHud() {
   const sec = String(t % 60).padStart(2, '0');
   const st = $('supTime');
   if (st) st.textContent = mm + ':' + sec;
-  const da = $('supDoorABtn'), db = $('supDoorBBtn');
-  if (da) {
-    if (supState.doorABroken) {
-      da.textContent = 'PUERTA A · FALLO';
-      da.style.borderColor = '#c9a227'; da.style.color = '#e8c44a';
+  updateDoorButtonsVisibility();
+  const da = $('supDoorABtn'), db = $('supDoorBBtn'), dc = $('supDoorCBtn');
+  function styleDoor(btn, closed, broken, openLab, closeLab, failLab) {
+    if (!btn) return;
+    btn.classList.toggle('broken', !!broken);
+    if (broken) {
+      btn.textContent = failLab;
+      btn.style.borderColor = '#c9a227'; btn.style.color = '#e8c44a';
+    } else if (closed) {
+      btn.textContent = closeLab;
+      btn.style.borderColor = '#c04040'; btn.style.color = '#ff9090';
     } else {
-      da.textContent = supState.doorA ? 'PUERTA A · CERRADA' : 'PUERTA A · ABIERTA';
-      da.style.borderColor = supState.doorA ? '#c04040' : '';
-      da.style.color = supState.doorA ? '#ff9090' : '';
+      btn.textContent = openLab;
+      btn.style.borderColor = ''; btn.style.color = '';
     }
   }
-  if (db) {
-    if (supState.doorBBroken) {
-      db.textContent = 'PUERTA B · FALLO';
-      db.style.borderColor = '#c9a227'; db.style.color = '#e8c44a';
-    } else {
-      db.textContent = supState.doorB ? 'PUERTA B · CERRADA' : 'PUERTA B · ABIERTA';
-      db.style.borderColor = supState.doorB ? '#c04040' : '';
-      db.style.color = supState.doorB ? '#ff9090' : '';
-    }
-  }
+  styleDoor(da, supState.doorA, supState.doorABroken, 'PUERTA A · ABIERTA', 'PUERTA A · CERRADA', 'PUERTA A · FALLO');
+  styleDoor(db, supState.doorB, supState.doorBBroken, 'PUERTA B · ABIERTA', 'PUERTA B · CERRADA', 'PUERTA B · FALLO');
+  styleDoor(dc, supState.doorC, supState.doorCBroken, 'CONDUCTO · ABIERTO', 'CONDUCTO · CERRADO', 'CONDUCTO · FALLO');
   const pw = $('supPower');
   if (pw) {
     if (supState.powerBroken) pw.textContent = '??%';
@@ -3256,7 +3350,7 @@ function wireUI() {
   on($('supChatSend'), 'click', sendSupChat);
   on($('supChatInput'), 'keydown', e => { if (e.key === 'Enter') sendSupChat(); });
   on($('supDoorABtn'), 'click', () => {
-    if (!supState) return;
+    if (!supState || supState.repairing) return;
     if (supState.doorABroken) { showSysMsg('PUERTA A EN FALLO — REPARA', 1800, true); return; }
     if (supState.powerBroken) { showSysMsg('ENERGÍA EN FALLO', 1800, true); return; }
     if (supState.power <= 0 && !supState.doorA) return;
@@ -3264,53 +3358,56 @@ function wireUI() {
     renderSupHud();
   });
   on($('supDoorBBtn'), 'click', () => {
-    if (!supState) return;
+    if (!supState || supState.repairing) return;
     if (supState.doorBBroken) { showSysMsg('PUERTA B EN FALLO — REPARA', 1800, true); return; }
     if (supState.powerBroken) { showSysMsg('ENERGÍA EN FALLO', 1800, true); return; }
     if (supState.power <= 0 && !supState.doorB) return;
     supState.doorB = !supState.doorB;
     renderSupHud();
   });
+  on($('supDoorCBtn'), 'click', () => {
+    if (!supState || supState.repairing) return;
+    if (supState.doorCBroken) { showSysMsg('CONDUCTO EN FALLO — REPARA', 1800, true); return; }
+    if (supState.powerBroken) { showSysMsg('ENERGÍA EN FALLO', 1800, true); return; }
+    if (supState.power <= 0 && !supState.doorC) return;
+    supState.doorC = !supState.doorC;
+    renderSupHud();
+  });
   on($('supScanBtn'), 'click', () => {
-    if (!supState) return;
+    if (!supState || supState.repairing) return;
+    closeSupCamView();
     supState.mode = supState.mode === 'scan' ? 'none' : 'scan';
-    if (supState.mode === 'scan') appendSupLog('supPlayLog', 'ESCANEO: elige una zona en el mapa.', 'sys');
+    if (supState.mode === 'scan') appendSupLog('supPlayLog', 'ESCANEO: toca una zona (rápido).', 'sys');
     updateSupToolsUI();
   });
   on($('supCamBtn'), 'click', () => {
-    if (!supState) return;
+    if (!supState || supState.repairing) return;
+    if ($('supCamView') && $('supCamView').style.display !== 'none') { closeSupCamView(); return; }
     supState.mode = supState.mode === 'cam' ? 'none' : 'cam';
-    if (supState.mode === 'cam') appendSupLog('supPlayLog', 'CÁMARAS: elige una habitación.', 'sys');
+    if (supState.mode === 'cam') appendSupLog('supPlayLog', 'CÁMARAS: toca una habitación.', 'sys');
     updateSupToolsUI();
   });
+  on($('supCamExit'), 'click', closeSupCamView);
   on($('supVentBtn'), 'click', () => {
-    if (!supState) return;
+    if (!supState || supState.repairing) return;
+    closeSupCamView();
     supState.mapLayer = supState.mapLayer === 'vent' ? 'main' : 'vent';
-    // toggle puerta C if on vent - show status
     buildSupMap();
     renderSupUnits();
-    if (supState.mapLayer === 'vent') {
-      appendSupLog('supPlayLog', 'Mapa de CONDUCTOS. Una sola puerta: CONDUCTO.', 'sys');
-    } else {
-      appendSupLog('supPlayLog', 'Mapa principal.', 'sys');
-    }
+    appendSupLog('supPlayLog', supState.mapLayer === 'vent' ? 'Conductos.' : 'Mapa principal.', 'sys');
+    updateDoorButtonsVisibility();
     updateSupToolsUI();
     renderSupHud();
   });
-  on($('supRepairBtn'), 'click', () => {
-    if (!supState) return;
-    let fixed = [];
-    if (supState.doorABroken) { TSSupervisor.repair(supState, 'doorA'); fixed.push('Puerta A'); }
-    if (supState.doorBBroken) { TSSupervisor.repair(supState, 'doorB'); fixed.push('Puerta B'); }
-    if (supState.doorCBroken) { TSSupervisor.repair(supState, 'doorC'); fixed.push('Conducto'); }
-    if (supState.powerBroken) { TSSupervisor.repair(supState, 'power'); fixed.push('Energía'); }
-    if (!fixed.length) showSysMsg('NADA QUE REPARAR', 1400);
-    else {
-      appendSupLog('supPlayLog', 'Reparación: ' + fixed.join(', '), 'sys');
-      showSysMsg('REPARADO', 1400);
-    }
-    renderSupHud();
+  on($('supRepairBtn'), 'click', openSupRepairMenu);
+  on($('supRepairClose'), 'click', () => {
+    if (supState && supState.repairing) return;
+    const m = $('supRepairModal'); if (m) m.classList.remove('open');
   });
+  on($('repDoorA'), 'click', () => startRepair('doorA', 'Puerta A'));
+  on($('repDoorB'), 'click', () => startRepair('doorB', 'Puerta B'));
+  on($('repDoorC'), 'click', () => startRepair('doorC', 'Conducto'));
+  on($('repPower'), 'click', () => startRepair('power', 'Energía'));
   // legacy no-op keep parse if any
   on($('supDoorBtn'), 'click', () => {
     if (!supState) return;
