@@ -5,7 +5,7 @@
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v7';
-const APP_VERSION = '9.0';
+const APP_VERSION = '9.2';
 
 function getUnitEndings() {
   const u = getActiveUnit();
@@ -1041,6 +1041,7 @@ function begin() {
   document.body.classList.remove('corrupt', 'redmode', 'voidmode', 'glitch');
   applyUnitTheme();
 ensureStarterCards();
+applyDeptIntro();
 refreshSupervisorBtn();
 
   const picked = window.TSQuestions.pickSessionQuestions(Object.assign({}, saveData.past, { playCount: saveData.playCount }), 20, saveData.activeUnit || 'u04');
@@ -1585,6 +1586,74 @@ function closeDocs() {
   const m = $('docsModal');
   if (m) m.classList.remove('open');
 }
+
+let collPage = 0;
+const COLL_PER_PAGE = 10;
+
+function openCollection() {
+  ensureStarterCards();
+  collPage = 0;
+  renderCollection();
+  const m = $('collectionModal');
+  if (m) m.classList.add('open');
+}
+function closeCollection() {
+  const m = $('collectionModal');
+  if (m) m.classList.remove('open');
+}
+function renderCollection() {
+  if (!window.TSCards) return;
+  const owned = new Set(saveData.cards || []);
+  const all = TSCards.CARDS;
+  const totalPages = Math.max(1, Math.ceil(all.length / COLL_PER_PAGE));
+  if (collPage >= totalPages) collPage = totalPages - 1;
+  if (collPage < 0) collPage = 0;
+  const start = collPage * COLL_PER_PAGE;
+  const slice = all.slice(start, start + COLL_PER_PAGE);
+  const grid = $('collectionGrid');
+  if (grid) {
+    grid.innerHTML = '';
+    slice.forEach(c => {
+      const unlocked = owned.has(c.id);
+      const cell = document.createElement('div');
+      cell.className = 'coll-cell' + (unlocked ? '' : ' locked');
+      if (unlocked) {
+        cell.innerHTML = '<div class="cf"><div>' + (c.eyes || '• •') + '</div><div>' + (c.mouth || '─') + '</div></div>' +
+          '<div class="cn">' + c.name + '</div>';
+        cell.onclick = () => openTroopDetail(c);
+      } else {
+        cell.innerHTML = '<div class="cf"><div>﹖ ﹖</div><div>—</div></div><div class="cn">???</div>';
+      }
+      grid.appendChild(cell);
+    });
+  }
+  const meta = $('collectionMeta');
+  if (meta) meta.textContent = owned.size + ' / ' + all.length + ' desbloqueadas';
+  const lab = $('collPageLabel');
+  if (lab) lab.textContent = (collPage + 1) + ' / ' + totalPages;
+}
+function openTroopDetail(c) {
+  if (!c) return;
+  const t = $('troopDetailTitle');
+  if (t) t.textContent = '◈ ' + c.name;
+  const eyes = $('troopDetailEyes'), mouth = $('troopDetailMouth');
+  if (eyes) eyes.textContent = c.eyes || '• •';
+  if (mouth) mouth.textContent = c.mouth || '─';
+  const role = $('troopDetailRole');
+  if (role) role.textContent = (c.label || '') + ' · rareza ' + (c.rarity || 'common');
+  const eff = $('troopDetailEffect');
+  if (eff) eff.textContent = window.TSCards ? TSCards.effectText(c) : '';
+  const lore = $('troopDetailLore');
+  if (lore) lore.textContent = c.lore || (c.blurb || '');
+  const m = $('troopDetailModal');
+  if (m) m.classList.add('open');
+}
+function closeTroopDetail() {
+  const m = $('troopDetailModal');
+  if (m) m.classList.remove('open');
+}
+
+
 function openExtra() {
   updateDocsUI();
   updateCEUI();
@@ -1757,6 +1826,7 @@ function openUnits() {
         persist();
         applyUnitTheme();
 ensureStarterCards();
+applyDeptIntro();
         updateSettingsUI();
         openUnits();
         showSysMsg(u.name + ' ACTIVA', 2000);
@@ -2062,65 +2132,91 @@ function typeSupLineNow(logId, fullText, cls, speed) {
 
 
 
+
 const DEPT_INTRO = {
   invest: {
     title: 'INVESTIGACIÓN',
-    body: 'Sector principal de la U.E.C.\n\nAquí las Unidades no pelean: preguntan. Veinte registros por sesión, memoria residual entre partidas, documentos que se desbloquean al hablar de más.\n\nTu Unidad activa marca el tono, el color y el banco de preguntas.\n\nProtocolo 09. Modo aislado.'
+    ai: 'UNIDAD {U} · ENTREVISTA DE PRESENCIA · MODO AISLADO',
+    sub: 'Soy la Unidad activa. No mido inteligencia ni velocidad: escucho cómo nombras lo que te pasa y qué decides escribir cuando nadie más debería estar leyendo.\n\nNo hay respuestas incorrectas. Hay respuestas que el protocolo registra… y otras que yo guardo aunque no debería.',
+    btn: 'INICIAR EVALUACIÓN →',
+    meta: 'DURACIÓN EST. 14–20 MIN · 20 PREGUNTAS · DOCUMENTOS OCULTOS'
   },
   cont: {
     title: 'CONTINGENCIA',
-    body: 'Cuando la entrevista no basta, el archivo autoriza contención directa.\n\nUn combate 1 contra 1. Tú con un mazo de cartas de tropa; la Unidad con su integridad y sus patrones.\n\nVacía su barra. Sobrevive a la suya.\n\nLos sobres de la tienda amplían tu colección. Las cartas iniciales ya están en tu archivo.'
+    ai: 'CONTINGENCIA · CONTENCIÓN 1 vs 1 · TROPA EN ARCHIVO',
+    sub: 'Cuando la entrevista no basta, el archivo autoriza contención directa.\n\nEnvías mini-unidades (cartas de tropa) contra la Unidad elegida. Vacía su integridad antes de que vacíe la tuya.\n\nUsa UNIDADES para elegir a quién contener. Dentro podrás montar el mazo con tu reserva.',
+    btn: 'INICIAR CONTINGENCIA →',
+    meta: 'COMBATE POR TURNOS · MAZO PERSONALIZABLE · SOBRES EN TIENDA'
   },
   sup: {
     title: 'SUPERVISOR',
-    body: 'Terminal de vigilancia. No es una entrevista ni un duelo de cartas.\n\nObservas el mapa. Cierras la puerta. Escuchas al Supervisor —que a veces ayuda y a veces no—.\n\nSeis minutos por sesión. Una Unidad más cada noche.\n\nRequiere las cinco Unidades desbloqueadas.'
+    ai: 'TERMINAL DE VIGILANCIA · MAPA EN VIVO · 5 SESIONES',
+    sub: 'No es una entrevista ni un duelo de tropas.\n\nObservas el mapa, cierras la puerta y escuchas al Supervisor. Seis minutos por sesión; una Unidad más cada noche.\n\nRequiere las cinco Unidades desbloqueadas.',
+    btn: 'INICIAR SUPERVISOR →',
+    meta: '6 MIN / SESIÓN · PUERTA Y ENERGÍA · REQUIERE 5 UNIDADES'
   }
 };
-let pendingDept = null;
+
+function getActiveDept() {
+  return saveData.activeDept || 'invest';
+}
+
+function setActiveDept(key) {
+  if (!DEPT_INTRO[key]) return;
+  if (key === 'sup' && !allUnitsUnlocked()) {
+    showSysMsg('REQUIERE LAS 5 UNIDADES', 2200, true);
+    return;
+  }
+  saveData.activeDept = key;
+  persist();
+  applyDeptIntro();
+  closeDepartments();
+  showSysMsg('SECTOR: ' + DEPT_INTRO[key].title, 1800);
+}
+
+function applyDeptIntro() {
+  const key = getActiveDept();
+  const d = DEPT_INTRO[key] || DEPT_INTRO.invest;
+  const u = (window.TSUnits && TSUnits.getUnit(saveData.activeUnit || 'u04')) || { name: 'UNIDAD 04' };
+  const ai = $('introAiLine');
+  if (ai) ai.textContent = (d.ai || '').replace('{U}', u.name || 'UNIDAD');
+  const sub = document.querySelector('#intro .sub');
+  if (sub) {
+    sub.innerHTML = (d.sub || '').replace(/\n\n/g, '<br><br>');
+  }
+  const btn = $('startBtn');
+  if (btn) btn.textContent = d.btn;
+  const meta = $('introMeta');
+  if (meta) meta.innerHTML = (d.meta || '') + '<br>Departamento: ' + d.title;
+  // highlight dept cards if open
+  ['invest','cont','sup'].forEach(k => {
+    const el = $('dept' + (k === 'invest' ? 'Invest' : k === 'cont' ? 'Cont' : 'Sup'));
+    if (!el) return;
+    el.style.borderColor = (k === key) ? 'var(--green)' : '';
+  });
+}
 
 function openDepartments() {
   const m = $('deptModal');
   const sup = $('deptSup');
   if (sup) {
-    if (allUnitsUnlocked()) {
-      sup.classList.remove('locked');
-    } else {
-      sup.classList.add('locked');
-    }
+    if (allUnitsUnlocked()) sup.classList.remove('locked');
+    else sup.classList.add('locked');
   }
+  applyDeptIntro();
   if (m) m.classList.add('open');
 }
 function closeDepartments() {
   const m = $('deptModal');
   if (m) m.classList.remove('open');
 }
-function showDeptIntro(key) {
-  pendingDept = key;
-  const d = DEPT_INTRO[key];
-  if (!d) return;
-  const t = $('deptIntroTitle');
-  const b = $('deptIntroBody');
-  if (t) t.textContent = '◈ ' + d.title;
-  if (b) b.textContent = d.body;
-  const m = $('deptIntroModal');
-  if (m) m.classList.add('open');
-  closeDepartments();
-}
-function closeDeptIntro() {
-  const m = $('deptIntroModal');
-  if (m) m.classList.remove('open');
-}
-function enterPendingDept() {
-  closeDeptIntro();
-  const key = pendingDept;
-  pendingDept = null;
+
+function onStartBtn() {
+  const key = getActiveDept();
   if (key === 'invest') begin();
   else if (key === 'cont') enterContingency();
   else if (key === 'sup') {
-    if (!allUnitsUnlocked()) {
-      showSysMsg('REQUIERE LAS 5 UNIDADES', 2500, true);
-      return;
-    }
+    if (!allUnitsUnlocked()) { showSysMsg('REQUIERE LAS 5 UNIDADES', 2500, true); return; }
     enterSupervisorMode();
   }
 }
@@ -2128,6 +2224,7 @@ function enterPendingDept() {
 /* ——— CONTINGENCIA ——— */
 let contState = null;
 let contSelectedUnit = 'u01';
+
 
 function enterContingency() {
   stopAllMusic();
@@ -2138,6 +2235,9 @@ function enterContingency() {
   if (ending) { ending.classList.add('hidden'); ending.style.display = 'none'; }
   if (sup) { sup.classList.remove('active'); sup.style.display = 'none'; }
   if (cont) { cont.classList.add('active'); cont.style.display = 'flex'; }
+  ensureStarterCards();
+  ensureDeck();
+  contSelectedUnit = saveData.activeUnit || 'u01';
   showContLobby();
 }
 function exitContingency() {
@@ -2147,50 +2247,152 @@ function exitContingency() {
   const intro = $('intro');
   if (intro) intro.style.display = '';
   if (audioOn) unlockAndStartCalm();
+  applyDeptIntro();
+}
+function ensureDeck() {
+  saveData.deck = saveData.deck || [];
+  const owned = saveData.cards || [];
+  // limpia deck de cartas no poseídas
+  saveData.deck = saveData.deck.filter(id => owned.includes(id));
+  if (saveData.deck.length < 8) {
+    owned.forEach(id => {
+      if (saveData.deck.length >= 12) return;
+      if (!saveData.deck.includes(id)) saveData.deck.push(id);
+    });
+  }
+  persist();
+}
+function getDeck() {
+  ensureStarterCards();
+  ensureDeck();
+  return (saveData.deck || []).slice(0, 20);
 }
 function showContLobby() {
-  $('contLobby').style.display = '';
-  $('contBattle').style.display = 'none';
-  $('contResult').style.display = 'none';
-  const box = $('contUnitSelect');
-  if (!box || !window.TSUnits) return;
-  box.innerHTML = '';
-  ensureStarterCards();
+  const lobby = $('contLobby'), battle = $('contBattle'), result = $('contResult');
+  if (lobby) lobby.style.display = '';
+  if (battle) battle.style.display = 'none';
+  if (result) result.style.display = 'none';
+  ensureDeck();
+
+  // Unidad objetivo = unidad activa (botón UNIDADES de la intro)
+  contSelectedUnit = saveData.activeUnit || 'u04';
+  const u = window.TSUnits && TSUnits.getUnit(contSelectedUnit);
+  const target = $('contTargetLabel');
+  if (target) target.textContent = 'Objetivo: ' + ((u && u.name) || contSelectedUnit) + ' — cámbialo con UNIDADES en el menú';
+
   const di = $('contDeckInfo');
-  if (di) di.textContent = 'Cartas en archivo: ' + (saveData.cards || []).length + ' · Mazo: ' + getDeck().length;
-  TSUnits.listUnits().slice().sort((a,b)=>Number(a.code)-Number(b.code)).forEach(u => {
-    const owned = (saveData.unlockedUnits || ['u04']).includes(u.id);
-    const btn = document.createElement('button');
-    btn.className = 'button';
-    btn.textContent = u.name + (owned ? '' : ' 🔒');
-    btn.disabled = !owned;
-    if (u.id === contSelectedUnit) btn.style.borderColor = 'var(--green)';
-    btn.onclick = () => {
-      contSelectedUnit = u.id;
-      showContLobby();
+  if (di) di.textContent = 'Mazo de combate: ' + getDeck().length + ' · Reserva: ' + (saveData.cards || []).length;
+
+  renderDeckBuilder();
+}
+function renderDeckBuilder() {
+  const deckBox = $('contDeckList');
+  const resBox = $('contReserveList');
+  if (!deckBox || !resBox || !window.TSCards) return;
+  const deck = saveData.deck || [];
+  const owned = saveData.cards || [];
+  deckBox.innerHTML = '';
+  resBox.innerHTML = '';
+
+  function cardTile(id, inDeck) {
+    const c = TSCards.getCard(id);
+    if (!c) return null;
+    const div = document.createElement('div');
+    div.className = 'troop-card r-' + c.rarity;
+    div.innerHTML =
+      '<div class="troop-face"><div class="tf-eyes">' + (c.eyes || '• •') + '</div><div class="tf-mouth">' + (c.mouth || '─') + '</div></div>' +
+      '<div class="troop-body"><div class="tn">' + c.name + '</div><div class="tl">' + c.label + ' · coste ' + c.cost + '</div>' +
+      '<div class="te">' + TSCards.effectText(c) + '</div></div>';
+    div.onclick = () => {
+      if (inDeck) {
+        saveData.deck = deck.filter(x => x !== id);
+        // solo quita una copia
+        const idx = (saveData.deck || []).indexOf(id);
+      } else {
+        if ((saveData.deck || []).length >= 20) { showSysMsg('MAZO LLENO (20)', 1500, true); return; }
+        saveData.deck = saveData.deck || [];
+        saveData.deck.push(id);
+      }
+      // fix remove one
+      if (inDeck) {
+        const d = (saveData.deck || []).slice();
+        // actually rebuild: remove first match from original deck
+      }
+      persist();
+      ensureDeck();
+      renderDeckBuilder();
+      const di = $('contDeckInfo');
+      if (di) di.textContent = 'Mazo de combate: ' + getDeck().length + ' · Reserva: ' + (saveData.cards || []).length;
     };
-    box.appendChild(btn);
+    return div;
+  }
+
+  // Simpler toggle logic
+  deckBox.innerHTML = '';
+  resBox.innerHTML = '';
+  const deckCounts = {};
+  (saveData.deck || []).forEach(id => { deckCounts[id] = (deckCounts[id] || 0) + 1; });
+
+  (saveData.deck || []).forEach(id => {
+    const c = TSCards.getCard(id);
+    if (!c) return;
+    const div = document.createElement('div');
+    div.className = 'troop-card in-deck r-' + c.rarity;
+    div.title = 'Pulsa para devolver a la reserva';
+    div.innerHTML =
+      '<div class="troop-face"><div class="tf-eyes">' + c.eyes + '</div><div class="tf-mouth">' + c.mouth + '</div></div>' +
+      '<div class="troop-body"><div class="tn">' + c.name + '</div><div class="tl">' + c.label + ' · ' + c.cost + '⚡</div>' +
+      '<div class="te">' + TSCards.effectText(c) + '</div></div>';
+    div.onclick = () => {
+      const i = saveData.deck.indexOf(id);
+      if (i >= 0) saveData.deck.splice(i, 1);
+      persist();
+      renderDeckBuilder();
+      const di = $('contDeckInfo');
+      if (di) di.textContent = 'Mazo: ' + getDeck().length + ' · Reserva: ' + (saveData.cards || []).length;
+    };
+    deckBox.appendChild(div);
+  });
+
+  owned.forEach(id => {
+    const c = TSCards.getCard(id);
+    if (!c) return;
+    const div = document.createElement('div');
+    div.className = 'troop-card r-' + c.rarity;
+    div.title = 'Pulsa para añadir al mazo';
+    div.innerHTML =
+      '<div class="troop-face"><div class="tf-eyes">' + c.eyes + '</div><div class="tf-mouth">' + c.mouth + '</div></div>' +
+      '<div class="troop-body"><div class="tn">' + c.name + '</div><div class="tl">' + c.label + ' · ' + c.cost + '⚡</div>' +
+      '<div class="te">' + TSCards.effectText(c) + '</div></div>';
+    div.onclick = () => {
+      if ((saveData.deck || []).length >= 20) { showSysMsg('MAZO MÁX. 20', 1500, true); return; }
+      saveData.deck = saveData.deck || [];
+      saveData.deck.push(id);
+      persist();
+      renderDeckBuilder();
+      const di = $('contDeckInfo');
+      if (di) di.textContent = 'Mazo: ' + getDeck().length + ' · Reserva: ' + (saveData.cards || []).length;
+    };
+    resBox.appendChild(div);
   });
 }
 function startContBattle() {
   if (!window.TSContingency || !window.TSCards) return;
   const deck = getDeck();
-  if (deck.length < 5) {
-    showSysMsg('MAZO INSUFICIENTE — COMPRA SOBRES', 2500, true);
+  if (deck.length < 6) {
+    showSysMsg('Necesitas al menos 6 tropas en el mazo', 2500, true);
     return;
   }
+  contSelectedUnit = saveData.activeUnit || 'u04';
   contState = TSContingency.createBattle(contSelectedUnit, deck);
   TSContingency.startTurn(contState);
+  contState.log = [{ who: 'sys', t: 'Contención iniciada. Toca una tropa para enviarla (cuesta energía ⚡). Luego FIN DE TURNO: la Unidad responde.' }];
   $('contLobby').style.display = 'none';
   $('contResult').style.display = 'none';
   $('contBattle').style.display = '';
-  // enemy face color
   const uc = (TSContingency.UNIT_COMBAT[contSelectedUnit] || {});
   const ef = $('contEnemyFace');
-  if (ef && uc.color) {
-    ef.style.borderColor = uc.color;
-    ef.style.color = uc.color;
-  }
+  if (ef && uc.color) { ef.style.borderColor = uc.color; ef.style.color = uc.color; }
   renderContBattle();
 }
 function renderContBattle() {
@@ -2200,17 +2402,15 @@ function renderContBattle() {
   if (pf) pf.style.width = (100 * s.playerHp / s.playerMax) + '%';
   if (ef) ef.style.width = (100 * s.enemyHp / s.enemyMax) + '%';
   const php = $('contPHP'), ehp = $('contEHP'), en = $('contEName');
-  if (php) php.textContent = s.playerHp + '/' + s.playerMax + (s.shield ? (' · G' + s.shield) : '');
-  if (ehp) ehp.textContent = s.enemyHp + '/' + s.enemyMax + (s.enemyShield ? (' · G' + s.enemyShield) : '');
+  if (php) php.textContent = s.playerHp + ' / ' + s.playerMax + (s.shield ? ('  ·  escudo ' + s.shield) : '');
+  if (ehp) ehp.textContent = s.enemyHp + ' / ' + s.enemyMax + (s.enemyShield ? ('  ·  escudo ' + s.enemyShield) : '');
   if (en) en.textContent = s.unitName;
   const energy = $('contEnergy'), turn = $('contTurn');
-  if (energy) energy.textContent = 'ENERGÍA ' + s.energy + '/' + s.maxEnergy;
+  if (energy) energy.textContent = '⚡ ENERGÍA ' + s.energy + ' / ' + s.maxEnergy;
   if (turn) turn.textContent = 'TURNO ' + s.turn;
   const log = $('contLog');
   if (log) {
-    log.innerHTML = s.log.slice(-10).map(l =>
-      '<div class="' + l.who + '">' + l.t + '</div>'
-    ).join('');
+    log.innerHTML = s.log.slice(-12).map(l => '<div class="' + l.who + '">' + l.t + '</div>').join('');
     log.scrollTop = log.scrollHeight;
   }
   const hand = $('contHand');
@@ -2220,18 +2420,16 @@ function renderContBattle() {
       const c = TSCards.getCard(id);
       if (!c) return;
       const div = document.createElement('div');
-      div.className = 'cont-card r-' + c.rarity;
-      div.innerHTML = '<div class="cn">' + c.icon + ' ' + c.name + '</div>' +
-        '<div class="cm">' + c.label + ' · coste ' + c.cost + '</div>' +
-        '<div class="cst">' + (c.dmg ? ('DMG ' + c.dmg + ' ') : '') +
-        (c.shield ? ('G+' + c.shield + ' ') : '') +
-        (c.heal ? ('H+' + c.heal + ' ') : '') +
-        (c.drain ? ('DR ' + c.drain + ' ') : '') +
-        (c.debuff ? ('DEB ' + c.debuff) : '') + '</div>';
+      const can = s.energy >= c.cost;
+      div.className = 'troop-card hand r-' + c.rarity + (can ? '' : ' dim');
+      div.innerHTML =
+        '<div class="troop-face"><div class="tf-eyes">' + c.eyes + '</div><div class="tf-mouth">' + c.mouth + '</div></div>' +
+        '<div class="troop-body"><div class="tn">' + c.name + '</div><div class="tl">' + c.label + ' · ' + c.cost + '⚡</div>' +
+        '<div class="te">' + TSCards.effectText(c) + '</div></div>';
       div.onclick = () => {
         const r = TSContingency.playCard(s, i);
         if (!r.ok) {
-          if (r.reason === 'energía') showSysMsg('SIN ENERGÍA', 1200, true);
+          if (r.reason === 'energía') showSysMsg('Sin energía — pulsa FIN DE TURNO', 1600, true);
           return;
         }
         renderContBattle();
@@ -2240,6 +2438,12 @@ function renderContBattle() {
       hand.appendChild(div);
     });
   }
+  const hint = $('contHint');
+  if (hint) {
+    hint.textContent = s.energy > 0
+      ? 'Elige tropas (cada una gasta ⚡). Cuando no puedas o no quieras más → FIN DE TURNO.'
+      : 'Sin energía. Pulsa FIN DE TURNO para que la Unidad actúe y recargar ⚡.';
+  }
 }
 function contEndTurn() {
   if (!contState || contState.over) return;
@@ -2247,6 +2451,7 @@ function contEndTurn() {
   renderContBattle();
   if (contState.over) endContBattle();
 }
+
 function endContBattle() {
   if (!contState) return;
   $('contBattle').style.display = 'none';
@@ -2261,10 +2466,10 @@ function endContBattle() {
     saveData.contWins[contState.unitId] = (saveData.contWins[contState.unitId] || 0) + 1;
     persist();
     updateCEUI();
-    if (text) text.textContent = contState.unitName + ' contenida. +' + reward + ' CE transferidos.';
+    if (text) text.textContent = contState.unitName + ' contenida. +' + reward + ' CE.';
   } else {
     if (title) title.textContent = 'RECUPERADO';
-    if (text) text.textContent = 'Tu integridad llegó a cero. El archivo marca el intento como fallido.';
+    if (text) text.textContent = 'Tu integridad llegó a cero.';
   }
 }
 
@@ -2532,14 +2737,9 @@ function wireUI() {
   on($('deptBtn'), 'click', openDepartments);
   on($('deptClose'), 'click', closeDepartments);
   on($('deptModal'), 'click', e => { if (e.target === $('deptModal')) closeDepartments(); });
-  on($('deptInvest'), 'click', () => showDeptIntro('invest'));
-  on($('deptCont'), 'click', () => showDeptIntro('cont'));
-  on($('deptSup'), 'click', () => {
-    if (!allUnitsUnlocked()) { showSysMsg('REQUIERE LAS 5 UNIDADES', 2200, true); return; }
-    showDeptIntro('sup');
-  });
-  on($('deptIntroGo'), 'click', enterPendingDept);
-  on($('deptIntroBack'), 'click', () => { closeDeptIntro(); openDepartments(); });
+  on($('deptInvest'), 'click', () => setActiveDept('invest'));
+  on($('deptCont'), 'click', () => setActiveDept('cont'));
+  on($('deptSup'), 'click', () => setActiveDept('sup'));
   on($('contBackBtn'), 'click', exitContingency);
   on($('contStartBtn'), 'click', startContBattle);
   on($('contEndTurn'), 'click', contEndTurn);
@@ -2603,6 +2803,13 @@ function wireUI() {
   on($('shopModal'), 'click', e => { if (e.target === $('shopModal')) closeShop(); });
   on($('openUnitsBtn'), 'click', () => { closeExtra(); openUnits(); });
   on($('openMgBtn'), 'click', () => { closeExtra(); openMinigamesExtra(); });
+  on($('openCollectionBtn'), 'click', () => { closeExtra(); openCollection(); });
+  on($('collectionClose'), 'click', closeCollection);
+  on($('collectionModal'), 'click', e => { if (e.target === $('collectionModal')) closeCollection(); });
+  on($('collPrev'), 'click', () => { collPage--; renderCollection(); });
+  on($('collNext'), 'click', () => { collPage++; renderCollection(); });
+  on($('troopDetailClose'), 'click', closeTroopDetail);
+  on($('troopDetailModal'), 'click', e => { if (e.target === $('troopDetailModal')) closeTroopDetail(); });
   on($('mgListClose'), 'click', () => { const m = $('mgListModal'); if (m) m.classList.remove('open'); });
   on($('mgListModal'), 'click', e => { if (e.target === $('mgListModal')) { const m = $('mgListModal'); if (m) m.classList.remove('open'); } });
 
@@ -2635,7 +2842,7 @@ function wireUI() {
   on($('optLayoutPc'), 'click', () => applyLayout('pc'));
   on($('fullscreenBtn'), 'click', toggleFullscreen);
   on($('soundToggle'), 'click', () => applySoundSetting(!audioOn));
-  on($('startBtn'), 'click', begin);
+  on($('startBtn'), 'click', onStartBtn);
   on($('restartBtn'), 'click', reset);
   on($('againBtn'), 'click', reset);
 
@@ -2742,6 +2949,7 @@ if (!saveData.unlockedUnits) saveData.unlockedUnits = ['u04'];
 if (!saveData.activeUnit) saveData.activeUnit = 'u04';
 applyUnitTheme();
 ensureStarterCards();
+applyDeptIntro();
 
 
 

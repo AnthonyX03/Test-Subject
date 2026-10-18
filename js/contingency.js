@@ -101,7 +101,7 @@
     state.hand.splice(handIndex, 1);
     state.discard.push(id);
 
-    let msg = card.name + ' · ';
+    let msg = 'Envías a ' + card.name + ' (' + (card.label || card.kind) + ') · ';
     let dmg = card.dmg + (state.playerBuff || 0);
     if (card.dmg) state.playerBuff = 0;
 
@@ -113,18 +113,18 @@
         dealt -= ab;
       }
       state.enemyHp = Math.max(0, state.enemyHp - dealt);
-      msg += dealt + ' daño';
+      msg += 'inflige ' + dealt + ' de daño';
       if (state.lines && state.lines.hit) {
         state.log.push({ who: 'enemy', t: state.lines.hit[Math.floor(Math.random() * state.lines.hit.length)] });
       }
     }
     if (card.shield) {
       state.shield += card.shield;
-      msg += (msg.endsWith('· ') ? '' : '. ') + '+' + card.shield + ' guarda';
+      msg += (msg.endsWith('· ') ? '' : '. ') + 'cubre con +' + card.shield + ' escudo';
     }
     if (card.heal) {
       state.playerHp = Math.min(state.playerMax, state.playerHp + card.heal);
-      msg += (msg.includes('daño') || msg.includes('guarda') ? '. ' : '') + '+' + card.heal + ' integridad';
+      msg += '. repara +' + card.heal + ' integridad';
     }
     if (card.drain) {
       let dealt = card.drain;

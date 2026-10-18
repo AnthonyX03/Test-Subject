@@ -1,37 +1,38 @@
-/* TEST SUBJECT — Cartas de Contingencia (200+) */
+/* TEST SUBJECT — Mini-unidades de Contingencia (200+) */
 (function (g) {
-  const TYPES = {
-    strike:   { kind: 'atk',  icon: '◆', label: 'GOLPE' },
-    pierce:   { kind: 'atk',  icon: '◇', label: 'PERFORAR' },
-    barrage:  { kind: 'atk',  icon: '▣', label: 'RÁFAGA' },
-    guard:    { kind: 'def',  icon: '▣', label: 'GUARDA' },
-    barrier:  { kind: 'def',  icon: '⬡', label: 'BARRERA' },
-    recover:  { kind: 'heal', icon: '✚', label: 'REPARAR' },
-    drain:    { kind: 'atk',  icon: '◎', label: 'DRENAR' },
-    glitch:   { kind: 'deb',  icon: '⌁', label: 'GLITCH' },
-    protocol: { kind: 'buff', icon: '◈', label: 'PROTOCOLO' },
-    scan:     { kind: 'util', icon: '◉', label: 'ESCANEO' },
-    silence:  { kind: 'deb',  icon: '∅', label: 'SILENCIO' },
-    mirror:   { kind: 'def',  icon: '⬢', label: 'ESPEJO' }
+  // Roles de tropa (qué hace la mini-unidad)
+  const ROLES = {
+    striker:  { kind: 'atk',  label: 'ASALTO',   verb: 'ataca' },
+    piercer:  { kind: 'atk',  label: 'PERFORA',  verb: 'perfora' },
+    gunner:   { kind: 'atk',  label: 'RÁFAGA',   verb: 'abre fuego' },
+    guard:    { kind: 'def',  label: 'GUARDA',   verb: 'protege' },
+    shield:   { kind: 'def',  label: 'BARRERA',  verb: 'levanta escudo' },
+    medic:    { kind: 'heal', label: 'SOPORTE',  verb: 'repara' },
+    leech:    { kind: 'atk',  label: 'DRENA',    verb: 'drena' },
+    glitcher: { kind: 'deb',  label: 'GLITCH',   verb: 'desestabiliza' },
+    buffer:   { kind: 'buff', label: 'PROTOCOLO',verb: 'potencia' },
+    scout:    { kind: 'util', label: 'EXPLORA',  verb: 'explora' },
+    silencer: { kind: 'deb',  label: 'SILENCIO', verb: 'silencia' },
+    mirror:   { kind: 'def',  label: 'ESPEJO',   verb: 'refleja' }
   };
 
-  const PREFIXES = [
-    'Archivo','Sala 12','Núcleo','Pasillo','Terminal','Continuidad','Operador',
-    'Sujeto','Protocolo','Señal','Eco','Velo','Fragmento','Registro','Anomalía',
-    'Cierre','Umbral','Espejo','Ruido','Latencia','Checksum','Nodo','Vector',
-    'Cáscara','Residuo','Sombra','Vigilante','Expediente','Clave','Puerto'
+  const FACES = [
+    { eyes: '· ·', mouth: '─' }, { eyes: '• •', mouth: '﹀' }, { eyes: '◦ ◦', mouth: '‿' },
+    { eyes: '◉ ◉', mouth: '︵' }, { eyes: '× ×', mouth: '▬' }, { eyes: '◈ ◈', mouth: '─' },
+    { eyes: '· ·', mouth: '⌣' }, { eyes: '• •', mouth: '︿' }, { eyes: '◦ ◦', mouth: '─' },
+    { eyes: '▣ ▣', mouth: '﹀' }, { eyes: '◆ ◆', mouth: '─' }, { eyes: '○ ○', mouth: '‿' }
   ];
-  const SUFFIXES = [
-    'Alpha','Beta','Gamma','Delta','Épsilon','Zeta','Theta','Lambda','Sigma','Omega',
-    '01','07','09','12','18','22','27','33','41','48','55','60','66','72','81','90',
-    'Rojo','Verde','Ámbar','Violeta','Cian','Nulo','Frio','Cálido','Roto','Sello'
+
+  const FIRST = [
+    'Nox','Vera','Kade','Sil','Ryn','Osha','Pell','Juno','Tars','Echo',
+    'Mira','Vex','Lumen','Orin','Sable','Nyx','Casp','Reed','Wren','Ash',
+    'Quill','Dusk','Hex','Ivy','Knot','Lark','Moss','Pike','Rook','Sol',
+    'Thorn','Umbra','Vail','Wisp','Yarrow','Zed','Bram','Cinder','Drift','Flint'
   ];
-  const FLAVORS = [
-    'El archivo no olvida.','Firmado en tinta que no debería existir.','Latencia controlada.',
-    'Eco de una entrevista anterior.','No mirar el reverso.','Aprobado sin revisión.',
-    'Solo para operadores.','Clasificación: residual.','Copia no autorizada.',
-    'La unidad lo reconoce.','Falla a propósito.','Mantiene la puerta cerrada.',
-    'Rompe el patrón.','Extrae señal del ruido.','Cierra el bucle.'
+  const RANK = [
+    '01','02','03','04','05','06','07','08','09','10',
+    '11','12','14','15','17','18','19','21','22','23',
+    'A','B','C','D','E','K','M','R','S','X'
   ];
 
   function hash(s) {
@@ -40,47 +41,69 @@
     return h >>> 0;
   }
 
-  function buildCard(id, typeKey, power, cost, rarity, name, text) {
-    const t = TYPES[typeKey];
-    return {
-      id, type: typeKey, kind: t.kind, icon: t.icon, label: t.label,
-      power, cost, rarity, name, text,
-      // effects resolved in combat
-      dmg: t.kind === 'atk' ? power : 0,
-      shield: t.kind === 'def' ? power : 0,
-      heal: t.kind === 'heal' ? power : 0,
-      drain: typeKey === 'drain' ? Math.max(1, Math.floor(power * 0.6)) : 0,
-      debuff: (typeKey === 'glitch' || typeKey === 'silence') ? power : 0,
-      buff: typeKey === 'protocol' ? power : 0,
-      util: typeKey === 'scan' ? 1 : 0,
-      mirror: typeKey === 'mirror' ? 1 : 0
-    };
+  const roleKeys = Object.keys(ROLES);
+  const rarities = ['common', 'common', 'common', 'uncommon', 'uncommon', 'rare', 'rare', 'epic'];
+  const CARDS = [];
+  let n = 0;
+
+  for (let i = 0; i < FIRST.length; i++) {
+    for (let j = 0; j < 6; j++) {
+      const roleKey = roleKeys[(i + j * 3) % roleKeys.length];
+      const role = ROLES[roleKey];
+      const h = hash(FIRST[i] + RANK[j] + roleKey + String(i));
+      const power = 2 + (h % 7);
+      const cost = 1 + (h % 3);
+      const rarity = rarities[h % rarities.length];
+      const face = FACES[h % FACES.length];
+      const name = FIRST[i] + '-' + RANK[(i + j) % RANK.length];
+      const id = 'u' + String(++n).padStart(3, '0');
+      
+  const LORE_BITS = [
+    'Fue reclutado tras un fallo de continuidad en Sala 12.',
+    'Su expediente marca "residual". Nadie firmó el alta.',
+    'Habla poco. El protocolo lo prefiere así.',
+    'Lleva el sello de un operador que ya no aparece en el archivo.',
+    'Una copia imperfecta de otra tropa dada de baja.',
+    'Responde a estímulos de eco. A veces responde de más.',
+    'Asignado a contención menor. Hoy es todo lo que hay.',
+    'No recuerda la última entrevista. El archivo sí.',
+    'Su cara se sincroniza mal con el terminal.',
+    'Clasificación interna: útil hasta que deje de serlo.',
+    'Viene de un sobre abierto en un turno que no debió existir.',
+    'El Supervisor lo menciona en notas al margen.',
+    'Nunca ha visto la Oficina. Solo el pasillo.',
+    'Prefiere órdenes cortas. Las largas las interpreta mal.',
+    'Hay dos registros con el mismo código. Este es el que quedó.'
+  ];
+  function makeLore(card, h) {
+    const bit = LORE_BITS[h % LORE_BITS.length];
+    return card.name + ' · rol ' + card.label + '.\n' + bit + '\nCoste de despliegue: ' + card.cost + ' energía.';
   }
 
-  const CARDS = [];
-  const typeKeys = Object.keys(TYPES);
-  const rarities = ['common', 'common', 'common', 'uncommon', 'uncommon', 'rare', 'rare', 'epic'];
-
-  // 200+ unique combinatorial cards
-  let n = 0;
-  for (let i = 0; i < PREFIXES.length; i++) {
-    for (let j = 0; j < Math.min(7, SUFFIXES.length); j++) {
-      const typeKey = typeKeys[(i * 3 + j) % typeKeys.length];
-      const h = hash(PREFIXES[i] + SUFFIXES[j] + typeKey);
-      const power = 2 + (h % 7); // 2-8
-      const cost = 1 + (h % 3);  // 1-3
-      const rarity = rarities[h % rarities.length];
-      const name = PREFIXES[i] + ' ' + SUFFIXES[j];
-      const text = FLAVORS[h % FLAVORS.length];
-      const id = 'c' + String(++n).padStart(3, '0');
-      CARDS.push(buildCard(id, typeKey, power, cost, rarity, name, text));
+      const card = {
+        id, name, role: roleKey, kind: role.kind, label: role.label, verb: role.verb,
+        power, cost, rarity, face,
+        eyes: face.eyes, mouth: face.mouth,
+        dmg: role.kind === 'atk' ? power : 0,
+        shield: role.kind === 'def' ? power : 0,
+        heal: role.kind === 'heal' ? power : 0,
+        drain: roleKey === 'leech' ? Math.max(1, Math.floor(power * 0.65)) : 0,
+        debuff: (roleKey === 'glitcher' || roleKey === 'silencer') ? power : 0,
+        buff: roleKey === 'buffer' ? power : 0,
+        util: roleKey === 'scout' ? 1 : 0,
+        mirror: roleKey === 'mirror' ? 1 : 0,
+        blurb: name + ' ' + role.verb + '.',
+        lore: (function(){ const bit = LORE_BITS[h % LORE_BITS.length]; return name + ' · rol ' + role.label + '.\n' + bit + '\nCoste de despliegue: ' + cost + ' energía.'; })()
+      };
+      // leech still needs mild dmg path via drain only
+      if (roleKey === 'leech') card.dmg = 0;
+      CARDS.push(card);
       if (n >= 210) break;
     }
     if (n >= 210) break;
   }
 
-  // Starter set always available
-  const STARTER_IDS = CARDS.filter(c => c.rarity === 'common').slice(0, 12).map(c => c.id);
+  const STARTER_IDS = CARDS.filter(c => c.rarity === 'common').slice(0, 14).map(c => c.id);
 
   const PACKS = [
     { id: 'pack_basic', name: 'Sobre residual', price: 18, count: 3, weights: { common: 70, uncommon: 25, rare: 5, epic: 0 } },
@@ -95,31 +118,39 @@
     if (!pack) return [];
     const poolByR = {};
     CARDS.forEach(c => {
-      poolByR[c.rarity] = poolByR[c.rarity] || [];
-      poolByR[c.rarity].push(c);
+      (poolByR[c.rarity] = poolByR[c.rarity] || []).push(c);
     });
     const out = [];
     for (let i = 0; i < pack.count; i++) {
       const r = rollRarity(pack.weights);
-      const pool = poolByR[r] && poolByR[r].length ? poolByR[r] : CARDS;
+      const pool = (poolByR[r] && poolByR[r].length) ? poolByR[r] : CARDS;
       out.push(pool[Math.floor(Math.random() * pool.length)]);
     }
     return out;
   }
-
   function rollRarity(w) {
     const total = Object.values(w).reduce((a, b) => a + b, 0);
     let r = Math.random() * total;
-    for (const k of Object.keys(w)) {
-      r -= w[k];
-      if (r <= 0) return k;
-    }
+    for (const k of Object.keys(w)) { r -= w[k]; if (r <= 0) return k; }
     return 'common';
   }
 
+  function effectText(c) {
+    const parts = [];
+    if (c.dmg) parts.push(c.dmg + ' daño');
+    if (c.shield) parts.push('+' + c.shield + ' escudo');
+    if (c.heal) parts.push('+' + c.heal + ' vida');
+    if (c.drain) parts.push('drena ' + c.drain);
+    if (c.debuff) parts.push('debilita ' + c.debuff);
+    if (c.buff) parts.push('potencia +' + c.buff);
+    if (c.util) parts.push('+1 tropa');
+    if (c.mirror) parts.push('refleja el golpe');
+    return parts.join(' · ') || c.label;
+  }
+
   g.TSCards = {
-    CARDS, STARTER_IDS, PACKS, TYPES,
-    getCard, openPack,
+    CARDS, STARTER_IDS, PACKS, ROLES,
+    getCard, openPack, effectText,
     count: CARDS.length
   };
 })(typeof window !== 'undefined' ? window : global);
