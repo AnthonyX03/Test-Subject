@@ -5,7 +5,7 @@
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v7';
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.6';
 
 function getUnitEndings() {
   const u = getActiveUnit();
@@ -3228,7 +3228,7 @@ function supLoop(now) {
     if (supState.powerBroken || supState.power <= 0) {
       setScanner(false, true);
     } else {
-      supState.power = Math.max(0, supState.power - dt * 3.8);
+      supState.power = Math.max(0, supState.power - dt * 0.35);
       if (supState.power <= 0) setScanner(false, true);
     }
   }

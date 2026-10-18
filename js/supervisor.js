@@ -138,9 +138,10 @@
     }
 
     let drain = 0;
-    if (state.doorA) drain += 0.28;
-    if (state.doorB) drain += 0.28;
-    if (state.doorC) drain += 0.3;
+    // 1 puerta ≈ 6:00 continua; 2 puertas ≈ 3:00 continua
+    if (state.doorA) drain += 0.278;
+    if (state.doorB) drain += 0.278;
+    if (state.doorC) drain += 0.278;
     if (!state.powerBroken) state.power -= dt * drain;
     if (state.power <= 0) {
       state.power = 0;
