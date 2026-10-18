@@ -1,31 +1,31 @@
 /* TEST SUBJECT — Contingencia (combate 1v1 con cartas) */
 (function (g) {
   const UNIT_COMBAT = {
-    u01: { name: 'UNIDAD 01', hp: 28, atk: 4, color: '#4db8ff', lines: {
+    u01: { name: 'UNIDAD 01', hp: 26, atk: 3, color: '#4db8ff', lines: {
       hit: ['Registro clínico alterado.', 'Patrón detectado.'],
       low: ['Signos vitales inestables… míos.'],
       win: ['Sujeto contenido.'],
       lose: ['Evaluación… interrumpida.']
     }},
-    u02: { name: 'UNIDAD 02', hp: 26, atk: 5, color: '#ff6a90', lines: {
+    u02: { name: 'UNIDAD 02', hp: 26, atk: 4, color: '#ff6a90', lines: {
       hit: ['¿Eso es todo?', 'Me estás mirando demasiado.'],
       low: ['No cierres los ojos.'],
       win: ['Te vi primero.'],
       lose: ['…Interesante.']
     }},
-    u03: { name: 'UNIDAD 03', hp: 30, atk: 4, color: '#e8c44a', lines: {
+    u03: { name: 'UNIDAD 03', hp: 28, atk: 3, color: '#e8c44a', lines: {
       hit: ['Salto de sector.', 'No confíes en el orden.'],
       low: ['El mapa miente.'],
       win: ['Continuidad restaurada.'],
       lose: ['Fragmento perdido.']
     }},
-    u04: { name: 'UNIDAD 04', hp: 32, atk: 5, color: '#5dff88', lines: {
+    u04: { name: 'UNIDAD 04', hp: 30, atk: 4, color: '#5dff88', lines: {
       hit: ['Anotado.', 'Eso también queda en el expediente.'],
       low: ['¿Sigues escribiendo?'],
       win: ['Caso cerrado en apariencia.'],
       lose: ['El test… no termina así.']
     }},
-    u05: { name: 'UNIDAD 05', hp: 34, atk: 6, color: '#c8c8c8', lines: {
+    u05: { name: 'UNIDAD 05', hp: 32, atk: 5, color: '#c8c8c8', lines: {
       hit: ['…', 'No estoy.'],
       low: ['Casi invisible.'],
       win: ['Recuperado.'],
@@ -35,8 +35,12 @@
 
   function createBattle(unitId, deckIds) {
     const u = UNIT_COMBAT[unitId] || UNIT_COMBAT.u04;
-    const deck = (deckIds || []).slice();
-    // shuffle
+    // solo IDs válidos; si faltan, duplicar para no quedarse sin cartas
+    let deck = (deckIds || []).filter(id => g.TSCards && TSCards.getCard(id));
+    if (deck.length < 6 && g.TSCards) {
+      const pad = (TSCards.STARTER_IDS || []).filter(id => TSCards.getCard(id));
+      while (deck.length < 10 && pad.length) deck.push(pad[deck.length % pad.length]);
+    }
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       const t = deck[i]; deck[i] = deck[j]; deck[j] = t;
@@ -46,8 +50,8 @@
       unitName: u.name,
       unitColor: u.color,
       lines: u.lines,
-      playerHp: 30,
-      playerMax: 30,
+      playerHp: 36,
+      playerMax: 36,
       enemyHp: u.hp,
       enemyMax: u.hp,
       baseAtk: u.atk,
@@ -78,6 +82,10 @@
           const b = Math.floor(Math.random() * (a + 1));
           const t = state.deck[a]; state.deck[a] = state.deck[b]; state.deck[b] = t;
         }
+      }
+      // saltar IDs inválidos
+      while (state.deck.length && g.TSCards && !TSCards.getCard(state.deck[state.deck.length - 1])) {
+        state.deck.pop();
       }
       if (state.deck.length) state.hand.push(state.deck.pop());
     }
@@ -162,7 +170,7 @@
   function endTurn(state) {
     if (state.over) return;
     // Enemy act
-    let atk = state.baseAtk + Math.floor(state.turn / 3) + Math.floor(Math.random() * 3);
+    let atk = state.baseAtk + Math.floor(state.turn / 4) + Math.floor(Math.random() * 2);
     if (state.enemyDebuff > 0) {
       atk = Math.max(1, atk - state.enemyDebuff);
       state.enemyDebuff = 0;

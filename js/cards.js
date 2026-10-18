@@ -16,6 +16,10 @@
     mirror:   { kind: 'def',  label: 'ESPEJO',   verb: 'refleja' }
   };
 
+  const FACE_COLORS = [
+    '#5dff88','#4db8ff','#ff6a90','#e8c44a','#c8a0ff','#7ad4c8',
+    '#ff9a5c','#90b0ff','#b8e060','#ff80b0','#60d4ff','#d4a060'
+  ];
   const FACES = [
     { eyes: '· ·', mouth: '─' }, { eyes: '• •', mouth: '﹀' }, { eyes: '◦ ◦', mouth: '‿' },
     { eyes: '◉ ◉', mouth: '︵' }, { eyes: '× ×', mouth: '▬' }, { eyes: '◈ ◈', mouth: '─' },
@@ -83,6 +87,7 @@
       const card = {
         id, name, role: roleKey, kind: role.kind, label: role.label, verb: role.verb,
         power, cost, rarity, face,
+        faceColor: FACE_COLORS[h % FACE_COLORS.length],
         eyes: face.eyes, mouth: face.mouth,
         dmg: role.kind === 'atk' ? power : 0,
         shield: role.kind === 'def' ? power : 0,
@@ -93,7 +98,12 @@
         util: roleKey === 'scout' ? 1 : 0,
         mirror: roleKey === 'mirror' ? 1 : 0,
         blurb: name + ' ' + role.verb + '.',
-        lore: (function(){ const bit = LORE_BITS[h % LORE_BITS.length]; return name + ' · rol ' + role.label + '.\n' + bit + '\nCoste de despliegue: ' + cost + ' energía.'; })()
+        lore: (function(){
+          const bit = LORE_BITS[h % LORE_BITS.length];
+          const origin = ['Sala 12','Archivo residual','Pasillo B','Núcleo','Terminal de operadores','Zona de eco'][h % 6];
+          const note = ['No responde a llamadas fuera de protocolo.','Marcado como intercambiable.','Prefiere turnos cortos.','El Supervisor lo ha citado una vez.','Su código se repite en otro sobre.','Aprobado sin firma legible.'][h % 6];
+          return name + ' — ' + role.label + '\nOrigen: ' + origin + '.\n' + bit + '\n' + note + '\nDespliegue: ' + cost + ' ⚡ · potencia base ' + power + '.';
+        })()
       };
       // leech still needs mild dmg path via drain only
       if (roleKey === 'leech') card.dmg = 0;
