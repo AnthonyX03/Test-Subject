@@ -5,7 +5,7 @@
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v7';
-const APP_VERSION = '1.1';
+const APP_VERSION = '1.2';
 
 function getUnitEndings() {
   const u = getActiveUnit();
@@ -2928,16 +2928,7 @@ function buildSupMap() {
 }
 function onSupNodeClick(id, label) {
   if (!supState || supState.repairing) return;
-  if (supState.mode === 'scan') {
-    supState.scanRoom = id;
-    supState.scanTimer = 3.5;
-    supState.mode = 'none';
-    const here = Object.values(supState.units).filter(u => u.loc === id && u.layer === supState.mapLayer);
-    const tip = here.length ? ('señal: ' + here.map(u => u.name).join(', ')) : 'sin señal clara';
-    appendSupLog('supPlayLog', 'ESCANEO → ' + label + ' · ' + tip, 'sys');
-    updateSupToolsUI();
-    return;
-  }
+  // En modo escaneo no hace falta tocar nodos: el radar es global
   if (supState.mode === 'cam') {
     openSupCamView(id, label);
   }
@@ -2956,15 +2947,18 @@ function openSupCamView(id, label) {
   if (here.length) {
     const u = here[0];
     const col = (u.face && u.face.color) || '#7dff9a';
-    if (face) { face.style.borderColor = col; face.style.color = col; }
+    if (face) {
+      face.style.display = '';
+      face.style.borderColor = col;
+      face.style.color = col;
+    }
     if (eyes) eyes.textContent = (u.face && u.face.eyes) || '• •';
     if (mouth) mouth.textContent = (u.face && u.face.mouth) || '─';
-    if (text) text.textContent = u.name + (u.hidden ? ' · oculto en zona' : ' · presente');
-    if (here.length > 1 && text) text.textContent += ' (+' + (here.length - 1) + ')';
+    let msg = u.name + (u.hidden ? ' · oculto' : ' · presente');
+    if (here.length > 1) msg += ' (+' + (here.length - 1) + ')';
+    if (text) text.textContent = msg;
   } else {
-    if (face) { face.style.borderColor = ''; face.style.color = ''; }
-    if (eyes) eyes.textContent = '· ·';
-    if (mouth) mouth.textContent = '─';
+    if (face) face.style.display = 'none';
     if (text) text.textContent = 'Vacío. Nada en el marco.';
   }
   appendSupLog('supPlayLog', 'CÁMARA ' + label, 'sys');
@@ -3070,7 +3064,7 @@ function updateSupToolsUI() {
   const st = $('supStatusLine');
   if (st) {
     let t = (supState.mapLayer === 'vent' ? 'Conductos' : 'Mapa principal');
-    if (supState.mode === 'scan') t += ' · elige zona a escanear';
+    if (supState.scanning || supState.mode === 'scan') t += ' · ESCÁNER ON (gasta energía)';
     if (supState.mode === 'cam') t += ' · elige cámara';
     if (supState.powerBroken) t += ' · ENERGÍA EN FALLO';
     st.textContent = t;
@@ -3081,7 +3075,12 @@ function updateSupToolsUI() {
 function renderSupUnits() {
   const layer = $('supUnitsLayer');
   if (!layer || !supState) return;
-  // limpiar unidades de otra capa
+  const scanOn = !!(supState.scanning || supState.mode === 'scan');
+  // sin escáner: no se ven unidades en el mapa
+  if (!scanOn) {
+    layer.innerHTML = '';
+    return;
+  }
   layer.querySelectorAll('.sup-unit').forEach(el => {
     const id = el.dataset.uid;
     const u = supState.units[id];
@@ -3102,22 +3101,15 @@ function renderSupUnits() {
         '<div class="u-name">' + u.name + '</div>';
       layer.appendChild(el);
     }
-    // posición según nodos de su capa
-    const NODES = u.layer === 'vent' ? TSSupervisor.NODES_VENT : TSSupervisor.NODES_MAIN;
-    const n = NODES[u.loc];
-    if (n) {
-      // interpolar hacia nodo real de la capa visible
-      el.style.left = u.x + '%';
-      el.style.top = u.y + '%';
-    }
-    const showHidden = (supState.mode === 'cam' && supState.camRoom === u.loc) ||
-      (supState.scanTimer > 0 && supState.scanRoom === u.loc);
-    if (u.hidden && !showHidden) {
+    el.style.left = u.x + '%';
+    el.style.top = u.y + '%';
+    // ocultos: casi invisibles salvo que el escáner esté ON (ya lo está)
+    if (u.hidden) {
+      el.style.opacity = '0.35';
       el.classList.add('hidden-unit');
-      el.style.opacity = '0.08';
     } else {
       el.classList.remove('hidden-unit');
-      el.style.opacity = (u.id === 'u05' && !showHidden) ? '0.45' : '1';
+      el.style.opacity = u.id === 'u05' ? '0.55' : '1';
     }
   });
 }
@@ -3309,6 +3301,9 @@ function sendSupChat() {
 
 function wireUI() {
 
+  // ABORT_WIRE_V12
+
+
   on($('deptBtn'), 'click', openDepartments);
   on($('oficinaBtn'), 'click', enterOficina);
   on($('officeExit'), 'click', exitOficina);
@@ -3340,11 +3335,26 @@ function wireUI() {
   on($('supervisorBtn'), 'click', enterSupervisorMode);
   on($('supStartNight'), 'click', startSupNight);
   on($('supAbortBrief'), 'click', exitSupervisorMode);
-  on($('supAbortPlay'), 'click', () => { const m = $('supAbortModal'); if (m) m.classList.add('open'); });
-  on($('supAbortYes'), 'click', () => { const m = $('supAbortModal'); if (m) m.classList.remove('open'); exitSupervisorMode(); });
-  on($('supAbortNo'), 'click', () => { const m = $('supAbortModal'); if (m) m.classList.remove('open'); });
+  on($('supAbortPlay'), 'click', function (e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    var m = $('supAbortModal');
+    if (m) m.classList.add('open');
+  });
+  on($('supAbortYes'), 'click', function (e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    var m = $('supAbortModal');
+    if (m) m.classList.remove('open');
+    exitSupervisorMode();
+  });
+  on($('supAbortNo'), 'click', function (e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    var m = $('supAbortModal');
+    if (m) m.classList.remove('open');
+  });
+  on($('supAbortModal'), 'click', function (e) {
+    if (e.target === $('supAbortModal')) $('supAbortModal').classList.remove('open');
+  });
 
-  on($('supAbortPlay'), 'click', () => { if (supRaf) cancelAnimationFrame(supRaf); exitSupervisorMode(); });
   on($('supExit'), 'click', exitSupervisorMode);
   on($('supNext'), 'click', supContinue);
   on($('supChatSend'), 'click', sendSupChat);
@@ -3376,9 +3386,21 @@ function wireUI() {
   on($('supScanBtn'), 'click', () => {
     if (!supState || supState.repairing) return;
     closeSupCamView();
-    supState.mode = supState.mode === 'scan' ? 'none' : 'scan';
-    if (supState.mode === 'scan') appendSupLog('supPlayLog', 'ESCANEO: toca una zona (rápido).', 'sys');
+    if (supState.mode === 'scan') {
+      supState.mode = 'none';
+      supState.scanning = false;
+      appendSupLog('supPlayLog', 'Escáner OFF.', 'sys');
+    } else {
+      if (supState.powerBroken || supState.power <= 0) {
+        showSysMsg('SIN ENERGÍA PARA ESCÁNER', 1800, true);
+        return;
+      }
+      supState.mode = 'scan';
+      supState.scanning = true;
+      appendSupLog('supPlayLog', 'Escáner ON · unidades visibles · gasta energía.', 'sys');
+    }
     updateSupToolsUI();
+    renderSupUnits();
   });
   on($('supCamBtn'), 'click', () => {
     if (!supState || supState.repairing) return;

@@ -101,7 +101,7 @@
       doorA: false, doorB: false, doorC: false,
       doorABroken: false, doorBBroken: false, doorCBroken: false,
       powerBroken: false,
-      mapLayer: 'main', // main | vent
+      mapLayer: 'main', scanning: false,
       mode: 'none', // none | scan | cam
       camRoom: null,
       scanRoom: null, scanTimer: 0,
