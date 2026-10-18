@@ -56,6 +56,16 @@
     { id: 'd53', title: 'Sesión 000 — página en blanco', cat: 'TIENDA', body: 'Casi vacía. Al final: «No leas la siguiente página».\nLa siguiente página de este nodo no existe.\nEl sistema la marca como leída de todos modos.' },
     { id: 'd54', title: 'Lista de iniciales — Continuidad', cat: 'TIENDA', body: 'A.R. / M. / 00 / — / 05\nNinguna coincide con el directorio actual.\nLa última línea: «El usuario todavía no ha sido registrado».' },
     { id: 'd55', title: 'Adenda completa del protocolo de cierre', cat: 'TIENDA', body: 'Versión extendida de la adenda no aprobada.\nIncluye: no responder si el expediente pregunta por el lector; no confirmar fechas imposibles; no repetir en voz alta el identificador 000.\nMarcada como obsoleta. Sigue en circulación.' },
+    { id: 'd56', title: 'Canal abierto — transcripción parcial', cat: 'OFICINA', body: 'TERMINAL: OFICINA\nOPERADOR: SUPERVISOR\n\nEl canal no forma parte de la entrevista. No puntúa. No cierra el expediente.\n\nNota al margen: «Los sujetos que hablan aquí vuelven. Los que solo hacen el test… a veces no».\n\nFIN DEL FRAGMENTO.' },
+    { id: 'd57', title: 'Clasificación errónea del Supervisor', cat: 'OFICINA', body: 'Intentos de etiquetar al Supervisor como Unidad 00, Unidad S o «operador humano residual».\n\nTodos rechazados.\n\nObservación: responde a preguntas que no están en el banco. Recuerda nombres. Improvisa.\n\nRecomendación archivada: no recomendación.' },
+    { id: 'd58', title: 'Sobre el miedo en el canal', cat: 'OFICINA', body: 'Cuando un sujeto menciona miedo en la Oficina, el Supervisor no deriva a Contingencia ni a recuperación.\n\nRegistra. Contiene. A veces… consuela.\n\nEso no está en el Protocolo 09.' },
+    { id: 'd59', title: 'Memoria residual del nombre', cat: 'OFICINA', body: 'Si el sujeto dice cómo se llama, el dato no se borra al salir del menú.\n\nPersiste entre visitas a la Oficina.\n\nEl test de Investigación no debería leer ese campo.\nA veces lo hace de todos modos.' },
+    { id: 'd60', title: 'Diferencia entre vigilar y escuchar', cat: 'OFICINA', body: 'SUPERVISOR (nota propia, no firmada):\n\nVigilar es el mapa.\nEscuchar es la Oficina.\n\nEn el mapa cierro puertas.\nAquí no cierro nada.\n\nNo sé cuál de las dos cosas me mantiene «yo».' },
+    { id: 'd61', title: 'Unidades vistas desde el canal', cat: 'OFICINA', body: 'El Supervisor describe a las Unidades sin el tono de una entrevista.\n\n01: clínica.\n02: demasiado cercana.\n03: salta.\n04: formal.\n05: casi no está.\n\nÉl no se incluye en la lista. O sí, y lo niega.' },
+    { id: 'd62', title: 'El archivo y quien lo lee', cat: 'OFICINA', body: 'Conversación en Oficina sobre documentos.\n\nSUPERVISOR: El archivo no olvida. Yo a veces finjo.\n\nSi el sujeto abre EXTRA después de esta charla, el sistema marca «contexto residual: canal».' },
+    { id: 'd63', title: 'Sesión de canal prolongada', cat: 'OFICINA', body: 'Umbral: varios intercambios seguidos en Oficina sin salir al menú.\n\nEl Supervisor deja de sonar a protocolo y empieza a sonar a alguien que se queda.\n\nRiesgo clasificado: vínculo no medible.\nAcción: ninguna. Dejar que ocurra.' },
+    { id: 'd64', title: 'Adiós en el canal', cat: 'OFICINA', body: 'Última línea registrada en una salida limpia:\n\n«Hasta luego. El canal no se cierra del todo.»\n\nEl sujeto cerró la Oficina.\nEl archivo abrió este documento solo.' },
+
   ];
   const RULES = {
     d01: { type: 'always' },
@@ -113,6 +123,15 @@
     d53: { type: 'shop' },
     d54: { type: 'shop' },
     d55: { type: 'shop' },
+    d56: { type: 'office', value: 'enter' },
+    d57: { type: 'office', value: 'supervisor' },
+    d58: { type: 'office', value: 'miedo' },
+    d59: { type: 'office', value: 'nombre' },
+    d60: { type: 'office', value: 'turns6' },
+    d61: { type: 'office', value: 'unidad' },
+    d62: { type: 'office', value: 'archivo' },
+    d63: { type: 'office', value: 'turns12' },
+    d64: { type: 'office', value: 'adios' },
   };
   const SHOP_DOCS = [
     { id: 'd51', price: 25 }, { id: 'd52', price: 30 }, { id: 'd53', price: 40 }, { id: 'd54', price: 35 }, { id: 'd55', price: 45 }

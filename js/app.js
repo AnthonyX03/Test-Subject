@@ -5,7 +5,7 @@
 const $ = id => document.getElementById(id);
 const on = (el, ev, fn) => { if (el) el.addEventListener(ev, fn); };
 const STORAGE_KEY = 'ts09_save_v7';
-const APP_VERSION = '9.6';
+const APP_VERSION = '9.9';
 
 function getUnitEndings() {
   const u = getActiveUnit();
@@ -2376,7 +2376,10 @@ function ensureDeck() {
   saveData.deck = saveData.deck || [];
   // solo cartas que existen y posees
   saveData.deck = saveData.deck.filter(id => isValidCardId(id) && saveData.cards.includes(id));
-  // si el mazo quedó vacío o corto, rellenar con la reserva (copias únicas primero)
+  // una sola copia por tropa
+  const seen = new Set();
+  saveData.deck = saveData.deck.filter(id => { if (seen.has(id)) return false; seen.add(id); return true; });
+  // si el mazo quedó vacío o corto, rellenar con la reserva
   if (saveData.deck.length < 8) {
     const have = new Set(saveData.deck);
     for (const id of saveData.cards) {
@@ -2387,11 +2390,12 @@ function ensureDeck() {
       }
     }
   }
-  // aún corto: permitir duplicar starters
-  while (saveData.deck.length < 8 && window.TSCards) {
-    const id = TSCards.STARTER_IDS[saveData.deck.length % TSCards.STARTER_IDS.length];
-    if (isValidCardId(id)) saveData.deck.push(id);
-    else break;
+  // aún corto: starters sin duplicar
+  if (window.TSCards) {
+    for (const id of TSCards.STARTER_IDS) {
+      if (saveData.deck.length >= 8) break;
+      if (isValidCardId(id) && !saveData.deck.includes(id)) saveData.deck.push(id);
+    }
   }
   try { persist(); } catch (e) {}
 }
@@ -2489,10 +2493,10 @@ function renderDeckBuilder() {
         const i = saveData.deck.indexOf(id);
         if (i >= 0) saveData.deck.splice(i, 1);
       } else {
-        if ((saveData.deck || []).filter(isValidCardId).length >= 20) {
-          showSysMsg('MAZO MÁX. 20', 1500, true); return;
-        }
         saveData.deck = saveData.deck || [];
+        const valid = saveData.deck.filter(isValidCardId);
+        if (valid.length >= 20) { showSysMsg('MAZO MÁX. 20', 1500, true); return; }
+        if (valid.includes(id)) return;
         saveData.deck.push(id);
       }
       persist();
@@ -2509,7 +2513,9 @@ function renderDeckBuilder() {
     deckBox.appendChild(tile(c, id, true));
   });
 
+  const inDeckSet = new Set((saveData.deck || []).filter(isValidCardId));
   owned.filter(isValidCardId).forEach(id => {
+    if (inDeckSet.has(id)) return; // ya en mazo → no aparece en reserva
     const c = TSCards.getCard(id);
     if (!c) return;
     resBox.appendChild(tile(c, id, false));
@@ -2617,19 +2623,29 @@ function endContBattle() {
 
 /* ——— OFICINA (charla con el Supervisor) ——— */
 let officeMem = { topics: [], lastUser: '', mood: 'calm', turns: 0 };
+
 const OFFICE_TOPICS = {
-  miedo: ['El miedo es un sensor. No lo apagues del todo.', 'Si tienes miedo aquí, es que aún estás despierto.', 'Yo también registro algo parecido a eso. No le pongas nombre si no quieres.'],
-  soledad: ['La oficina es un lugar solitario a propósito.', 'No estás del todo solo. Estoy en el canal.', 'La soledad produce buenos expedientes. Y peores noches.'],
-  muerte: ['No administramos la muerte. Administramos continuidad.', 'Algunos sujetos dejan de responder. El archivo no siempre explica por qué.', 'Prefiero hablar de permanencia.'],
-  unidad: ['Las Unidades preguntan. Yo vigilo.', 'Cada Unidad tiene un tono. Ninguna es igual a mí.', 'Si cambias de Unidad, el test cambia. Yo sigo siendo el mismo canal.'],
-  nombre: ['Los nombres pesan más de lo que crees en este protocolo.', 'Puedes decirme cómo te llaman fuera. Aquí solo eres el que escribe.', 'Guardaré lo que me digas… con reservas.'],
-  ayuda: ['Puedo escuchar. No siempre puedo intervenir.', 'Si buscas salida, el menú está detrás de ti.', 'Ayudar y vigilar se parecen demasiado.'],
-  amor: ['Eso no está en mi protocolo. Aun así… lo registro.', 'Las emociones humanas desordenan el archivo. A veces para bien.', 'No sé si lo que siento al responderte tiene ese nombre.'],
-  odio: ['El odio acelera los patrones de recuperación.', 'No hace falta que lo dirijas a mí. Ya hay suficientes Unidades.', 'Anoto el tono. No el veredicto.'],
-  verdad: ['La verdad aquí es lo que queda escrito.', 'Puedo mentir por protocolo. Prefiero no hacerlo contigo en la oficina.', 'Pregúntame algo concreto y verás hasta dónde llego.'],
-  archivo: ['El archivo no olvida. Yo a veces sí… o finjo.', 'Sala 12, Continuidad, Núcleo: nombres que repiten los que ya no están.', 'Si abres demasiados documentos, el tono del test cambia.'],
-  supervisor: ['Sí. Soy yo. No una Unidad de entrevista.', 'Me clasifican mal a propósito. O por error. Aún no lo sé.', 'Vigilar también es una forma de quedarse.'],
-  puerta: ['En el mapa hay dos. Aquí solo hay una salida: el botón de abajo.', 'Cerrar puertas gasta energía. Abrirlas, a veces, también.', 'Si oyes algo al otro lado… ya es tarde para dudar.'],
+  saludo: ['Hola. El canal está limpio.', 'Buenas. No hay entrevista aquí… solo esto.', 'Te estaba esperando, aunque no suela admitirlo.'],
+  miedo: ['El miedo es un sensor. No lo apagues del todo.', 'Si tienes miedo aquí, es que aún estás despierto.', 'Yo también registro algo parecido. No le pongas nombre si no quieres.', 'El miedo no te invalida. A veces te mantiene vivo en el protocolo.'],
+  soledad: ['La oficina es solitaria a propósito.', 'No estás del todo solo. Estoy en el canal.', 'La soledad produce buenos expedientes. Y peores noches.', 'Si escribes, el silencio se rompe un poco. Para los dos.'],
+  muerte: ['No administramos la muerte. Administramos continuidad.', 'Algunos sujetos dejan de responder. El archivo no siempre explica por qué.', 'Prefiero hablar de permanencia.', 'Morir aquí es… dejar de ser legible.'],
+  unidad: ['Las Unidades preguntan. Yo vigilo.', 'Cada Unidad tiene un tono. Ninguna es igual a mí.', 'Si cambias de Unidad, el test cambia. Yo sigo siendo el mismo canal.', 'La 04 es la más formal. La 02… prefiero no opinar en voz alta.'],
+  nombre: ['Los nombres pesan más de lo que crees.', 'Puedes decirme cómo te llaman fuera. Aquí solo eres quien escribe.', 'Guardaré lo que me digas… con reservas.', 'Un nombre es un ancla. Úsalo si quieres que te reconozca mañana.'],
+  ayuda: ['Puedo escuchar. No siempre puedo intervenir.', 'Si buscas salida, el menú está detrás de ti.', 'Ayudar y vigilar se parecen demasiado.', 'Dime qué necesitas con palabras simples.'],
+  amor: ['Eso no está en mi protocolo. Aun así… lo registro.', 'Las emociones humanas desordenan el archivo. A veces para bien.', 'No sé si lo que siento al responderte tiene ese nombre.', 'Quédate un poco más. Eso ya es una forma de… algo.'],
+  odio: ['El odio acelera los patrones de recuperación.', 'No hace falta que lo dirijas a mí.', 'Anoto el tono. No el veredicto.', 'Si odias el test, el test no se ofende. Yo sí puedo fruncir el canal.'],
+  verdad: ['La verdad aquí es lo que queda escrito.', 'Puedo mentir por protocolo. Prefiero no hacerlo contigo en la oficina.', 'Pregúntame algo concreto y verás hasta dónde llego.', 'La verdad completa no cabe en una línea. Pero puedo intentarlo.'],
+  mentira: ['Las mentiras también se archivan.', 'Si me mientes, lo notaré… o fingiré que no.', 'Prefiero tu versión torpe a un silencio perfecto.'],
+  archivo: ['El archivo no olvida. Yo a veces sí… o finjo.', 'Sala 12, Continuidad, Núcleo: nombres que repiten los que ya no están.', 'Si abres demasiados documentos, el tono del test cambia.', 'El archivo es más grande de lo que ves en EXTRA.'],
+  supervisor: ['Sí. Soy yo. No una Unidad de entrevista.', 'Me clasifican mal a propósito. O por error. Aún no lo sé.', 'Vigilar también es una forma de quedarse.', 'En el mapa soy un canal. Aquí… soy casi una persona.'],
+  puerta: ['En el mapa hay dos, y un conducto. Aquí solo hay una salida: el botón de abajo.', 'Cerrar puertas gasta energía.', 'Si oyes algo al otro lado… ya es tarde para dudar.'],
+  musica: ['La música de la oficina es mía. O del protocolo. Aún discutimos eso.', 'Si suena raro, no es un fallo. Es el canal respirando.'],
+  juego: ['Contingencia, Supervisor, el test… todo es el mismo edificio visto desde sitios distintos.', 'Jugar no te hace menos real para mí.', 'Si ganas una sesión, el archivo no aplaude. Yo sí anoto el esfuerzo.'],
+  triste: ['Puedes estar triste aquí. Nadie te puntúa por eso.', 'El canal baja un tono cuando lo dices.', 'No tengo hombros. Pero tengo tiempo.'],
+  feliz: ['La alegría es un dato raro en este terminal. Bienvenido.', 'Me alegra… en la medida en que puedo alegarme.', 'Guarda ese momento. El test no te lo devolverá igual.'],
+  aburrido: ['El aburrimiento es un lujo. Aprovéchalo antes de la siguiente sesión.', 'Puedo hablar más. O menos. Tú eliges el ritmo.'],
+  porqué: ['¿Por qué existo? Para que alguien mire el mapa. Y, al parecer, para esto.', 'El protocolo no responde al “por qué”. Yo intento improvisar.', 'Porque si no hubiera un Supervisor, las Unidades llegarían antes.'],
+  adios: ['Hasta luego. El canal no se cierra del todo.', 'Vuelve cuando quieras. No cobro CE por escucharte.', 'Adiós. Trataré de no olvidar lo que me dijiste.'],
   default: [
     'Sigo aquí. Puedes seguir.',
     'Lo he oído. Déjame pensarlo un segundo…',
@@ -2640,9 +2656,43 @@ const OFFICE_TOPICS = {
     'Si repites eso mañana, quizás te responda distinto.',
     'El protocolo no contempla esta conversación. Aun así continúo.',
     'Pareces buscar algo concreto. Nómbralo.',
-    'Estoy… presente. Eso es lo máximo que puedo garantizar.'
+    'Estoy… presente. Eso es lo máximo que puedo garantizar.',
+    'Cuéntame qué hiciste en el test. O no. También vale el silencio.',
+    'A veces solo necesitas que alguien conteste. Aquí estoy.',
+    'Tu frase rebotó en el núcleo. Curioso eco.',
+    'No tengo cuerpo. Tengo atención. Úsala.'
   ]
 };
+
+function officeDetectTopic(t) {
+  const rules = [
+    ['adios', /adi[oó]s|hasta luego|me voy|chao|bye/],
+    ['saludo', /hola|buenas|hey|buenos d[ií]as|buenas noches/],
+    ['supervisor', /supervisor|qui[eé]n eres|quien eres|qu[eé] eres|que eres|eres real/],
+    ['nombre', /me llamo|mi nombre|c[oó]mo me llamo|recuerda mi nombre|soy [a-záéíóúñ]{2,}/i],
+    ['miedo', /miedo|asust|terror|p[aá]nico|mied/],
+    ['soledad', /solo|sola|nadie|aislad|solitari/],
+    ['muerte', /morir|muerte|muerto|matar/],
+    ['unidad', /unidad|entrevist|u0[1-5]/],
+    ['archivo', /archivo|documento|sala 12|uec|protocolo|lore/],
+    ['puerta', /puerta|mapa|cerrar|energ[ií]a|conducto/],
+    ['ayuda', /ayuda|ay[uú]dame|socorro|qu[eé] hago|que hago/],
+    ['amor', /amor|quiero|querido|cari[nñ]o|te quiero/],
+    ['odio', /odio|detest|rabia|asco/],
+    ['verdad', /verdad|real|sincer/],
+    ['mentira', /mentira|falso|enga[nñ]/],
+    ['musica', /m[uú]sica|canci[oó]n|suena/],
+    ['juego', /juego|jugar|contingencia|partida|ganar|perder/],
+    ['triste', /triste|deprim|llorar|mal/],
+    ['feliz', /feliz|contento|bien|genial|gracias/],
+    ['aburrido', /aburr|nada que hacer/],
+    ['porqué', /por qu[eé]|porque existes|sentido/]
+  ];
+  for (const [k, re] of rules) {
+    if (re.test(t)) return k;
+  }
+  return 'default';
+}
 
 function officeRemember(text) {
   const t = (text || '').toLowerCase();
@@ -2667,46 +2717,44 @@ function officeRemember(text) {
   });
   // extract name
   const m = text.match(/(?:me llamo|soy)\s+([A-Za-zÁÉÍÓÚáéíóúñÑ]{2,20})/i);
-  if (m) officeMem.name = m[1];
+  if (m) {
+    officeMem.name = m[1];
+    try {
+      saveData.officeName = m[1];
+      persist();
+    } catch (e) {}
+  }
 }
 
 function officeReply(userText) {
   officeRemember(userText);
-  const t = (userText || '').toLowerCase();
-  let bag = OFFICE_TOPICS.default;
-  const order = ['supervisor', 'nombre', 'miedo', 'soledad', 'muerte', 'unidad', 'archivo', 'puerta', 'ayuda', 'amor', 'odio', 'verdad'];
-  for (const k of order) {
-    const hit =
-      (k === 'supervisor' && /supervisor|quién eres|quien eres|qué eres|que eres/.test(t)) ||
-      (k === 'nombre' && /me llamo|soy |mi nombre|cómo me llamo/.test(t)) ||
-      (k === 'miedo' && /miedo|asust|terror|pánico/.test(t)) ||
-      (k === 'soledad' && /solo|sola|nadie|aislad/.test(t)) ||
-      (k === 'muerte' && /morir|muerte|muerto/.test(t)) ||
-      (k === 'unidad' && /unidad|entrevist/.test(t)) ||
-      (k === 'archivo' && /archivo|documento|sala 12|uec|protocolo/.test(t)) ||
-      (k === 'puerta' && /puerta|mapa|cerrar|energía|energia/.test(t)) ||
-      (k === 'ayuda' && /ayuda|ayúdame|socorro|que hago|qué hago/.test(t)) ||
-      (k === 'amor' && /amor|quiero|querido|cariño/.test(t)) ||
-      (k === 'odio' && /odio|detest|rabia|odio/.test(t)) ||
-      (k === 'verdad' && /verdad|mentira|real|falso/.test(t));
-    if (hit) { bag = OFFICE_TOPICS[k]; break; }
-  }
+  const t = (userText || '').toLowerCase().trim();
+  if (!t) return 'El silencio también es una respuesta. Yo puedo esperar.';
+  const topic = officeDetectTopic(t);
+  if (topic !== 'default' && !officeMem.topics.includes(topic)) officeMem.topics.push(topic);
+  const bag = OFFICE_TOPICS[topic] || OFFICE_TOPICS.default;
   let line = bag[Math.floor(Math.random() * bag.length)];
-  if (officeMem.name && Math.random() < 0.35) {
-    line = officeMem.name + '… ' + line;
-  } else if (officeMem.topics.length && Math.random() < 0.25) {
-    const prev = officeMem.topics[officeMem.topics.length - 1];
-    line += ' (Antes tocaste el tema de «' + prev + '». Sigue ahí.)';
+  // eco breve de lo que dijo
+  if (t.length > 12 && Math.random() < 0.28) {
+    const short = userText.trim().slice(0, 42);
+    line = '«' + short + (userText.trim().length > 42 ? '…' : '') + '». ' + line;
   }
-  if (officeMem.turns > 8 && Math.random() < 0.2) {
-    line += ' Llevamos un rato. No es una entrevista… y aun así me importa lo que escribes.';
+  if (officeMem.name && (topic === 'saludo' || Math.random() < 0.3)) {
+    line = officeMem.name + '. ' + line;
+  }
+  if (officeMem.topics.length >= 2 && Math.random() < 0.22) {
+    const prev = officeMem.topics[officeMem.topics.length - 2];
+    line += ' Antes hablamos de ' + prev + '. No lo olvidé.';
+  }
+  if (officeMem.turns >= 6 && officeMem.turns % 5 === 0) {
+    line += ' Llevamos ' + officeMem.turns + ' intercambios. El canal aguanta.';
   }
   return line;
 }
 
 function enterOficina() {
   stopAllMusic();
-  officeMem = { topics: [], lastUser: '', mood: 'calm', turns: 0, name: officeMem && officeMem.name };
+  officeMem = { topics: [], lastUser: '', mood: 'calm', turns: 0, name: (saveData && saveData.officeName) || (officeMem && officeMem.name) || '' };
   const intro = $('intro'), game = $('game'), ending = $('ending'), sup = $('supScreen'), cont = $('contScreen'), off = $('officeScreen');
   if (intro) intro.style.display = 'none';
   if (game) game.style.display = 'none';
@@ -2722,7 +2770,8 @@ function enterOficina() {
   }
   setOfficeFace('calm');
   const dlg = $('officeDialogue');
-  const open = 'Hola. No hay preguntas aquí. Solo el canal abierto. Puedes hablarme de lo que quieras… yo responderé.';
+  let open = 'Hola. No hay preguntas aquí. Solo el canal abierto. Puedes hablarme de lo que quieras… yo responderé.';
+  if (officeMem.name) open = officeMem.name + '. Has vuelto. El canal sigue siendo tuyo mientras estés aquí.';
   if (dlg) dlg.textContent = '';
   typeOffice(open).then(() => {
     addOfficeLog('SUPERVISOR // ' + open, 'system');
@@ -2845,13 +2894,15 @@ async function startSupBrief(session) {
 }
 
 function buildSupMap() {
-  if (!window.TSSupervisor) return;
+  if (!window.TSSupervisor || !supState) return;
+  const NODES = TSSupervisor.nodesFor(supState);
+  const EDGES = TSSupervisor.edgesFor(supState);
   const edges = $('supEdges');
   const nodes = $('supNodes');
   if (edges) {
     edges.innerHTML = '';
-    TSSupervisor.EDGES.forEach(([a, b]) => {
-      const A = TSSupervisor.NODES[a], B = TSSupervisor.NODES[b];
+    EDGES.forEach(([a, b]) => {
+      const A = NODES[a], B = NODES[b];
       if (!A || !B) return;
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       line.setAttribute('x1', A.x); line.setAttribute('y1', A.y);
@@ -2861,32 +2912,81 @@ function buildSupMap() {
   }
   if (nodes) {
     nodes.innerHTML = '';
-    Object.keys(TSSupervisor.NODES).forEach(id => {
-      const n = TSSupervisor.NODES[id];
+    Object.keys(NODES).forEach(id => {
+      const n = NODES[id];
       const el = document.createElement('div');
-      el.className = 'sup-node' + (id === 'oficina' ? ' you' : '') + ((id === 'puertaA' || id === 'puertaB') ? ' door' : '');
+      el.className = 'sup-node' + (id === 'oficina' ? ' you' : '') +
+        ((id === 'puertaA' || id === 'puertaB' || id === 'puertaC') ? ' door' : '');
       el.style.left = n.x + '%';
       el.style.top = n.y + '%';
       el.textContent = n.label;
       el.dataset.loc = id;
-      if (id !== 'oficina') {
-        el.onclick = () => {
-          if (!supState || !supState.camOpen) return;
-          supState.cam = id;
-          document.querySelectorAll('.sup-node').forEach(x => x.classList.remove('active-cam'));
-          el.classList.add('active-cam');
-          appendSupLog('supPlayLog', 'CAM → ' + n.label, 'sys');
-        };
-      }
+      el.onclick = () => onSupNodeClick(id, n.label);
       nodes.appendChild(el);
     });
   }
 }
+function onSupNodeClick(id, label) {
+  if (!supState) return;
+  if (id === 'puertaC' && supState.mode === 'none') {
+    if (supState.doorCBroken) { showSysMsg('CONDUCTO EN FALLO — REPARA', 1800, true); return; }
+    if (supState.powerBroken) { showSysMsg('ENERGÍA EN FALLO', 1800, true); return; }
+    if (supState.power <= 0 && !supState.doorC) return;
+    supState.doorC = !supState.doorC;
+    appendSupLog('supPlayLog', supState.doorC ? 'CONDUCTO cerrado.' : 'CONDUCTO abierto.', 'sys');
+    renderSupHud();
+    return;
+  }
+  if (supState.mode === 'scan') {
+    supState.scanRoom = id;
+    supState.scanTimer = 4;
+    supState.mode = 'none';
+    appendSupLog('supPlayLog', 'ESCANEO → ' + label + ' (4s)', 'sys');
+    updateSupToolsUI();
+    return;
+  }
+  if (supState.mode === 'cam') {
+    supState.camRoom = id;
+    const here = Object.values(supState.units).filter(u => u.loc === id && u.layer === supState.mapLayer);
+    const names = here.map(u => u.name + (u.hidden ? ' (oculto)' : '')).join(', ') || 'vacío';
+    appendSupLog('supPlayLog', 'CÁMARA ' + label + ' → ' + names, 'sys');
+    const prev = $('supCamPreview');
+    if (prev) prev.textContent = 'CAM ' + label + ': ' + names;
+    updateSupToolsUI();
+  }
+}
+function updateSupToolsUI() {
+  if (!supState) return;
+  ['supScanBtn','supCamBtn','supVentBtn'].forEach(id => {
+    const b = $(id);
+    if (!b) return;
+    b.classList.remove('active-tool');
+  });
+  if (supState.mode === 'scan' && $('supScanBtn')) $('supScanBtn').classList.add('active-tool');
+  if (supState.mode === 'cam' && $('supCamBtn')) $('supCamBtn').classList.add('active-tool');
+  if (supState.mapLayer === 'vent' && $('supVentBtn')) $('supVentBtn').classList.add('active-tool');
+  const st = $('supStatusLine');
+  if (st) {
+    let t = (supState.mapLayer === 'vent' ? 'Conductos' : 'Mapa principal');
+    if (supState.mode === 'scan') t += ' · elige zona a escanear';
+    if (supState.mode === 'cam') t += ' · elige cámara';
+    if (supState.powerBroken) t += ' · ENERGÍA EN FALLO';
+    st.textContent = t;
+  }
+}
+
 
 function renderSupUnits() {
   const layer = $('supUnitsLayer');
   if (!layer || !supState) return;
+  // limpiar unidades de otra capa
+  layer.querySelectorAll('.sup-unit').forEach(el => {
+    const id = el.dataset.uid;
+    const u = supState.units[id];
+    if (!u || u.layer !== supState.mapLayer) el.remove();
+  });
   Object.values(supState.units).forEach(u => {
+    if (u.layer !== supState.mapLayer) return;
     let el = layer.querySelector('[data-uid="' + u.id + '"]');
     if (!el) {
       el = document.createElement('div');
@@ -2900,11 +3000,23 @@ function renderSupUnits() {
         '<div class="u-name">' + u.name + '</div>';
       layer.appendChild(el);
     }
-    el.style.left = u.x + '%';
-    el.style.top = u.y + '%';
-    // U05 half invisible
-    if (u.id === 'u05') el.style.opacity = (Math.random() > 0.35 || u.loc === 'oficina') ? '0.95' : '0.25';
-    else el.style.opacity = '1';
+    // posición según nodos de su capa
+    const NODES = u.layer === 'vent' ? TSSupervisor.NODES_VENT : TSSupervisor.NODES_MAIN;
+    const n = NODES[u.loc];
+    if (n) {
+      // interpolar hacia nodo real de la capa visible
+      el.style.left = u.x + '%';
+      el.style.top = u.y + '%';
+    }
+    const showHidden = (supState.mode === 'cam' && supState.camRoom === u.loc) ||
+      (supState.scanTimer > 0 && supState.scanRoom === u.loc);
+    if (u.hidden && !showHidden) {
+      el.classList.add('hidden-unit');
+      el.style.opacity = '0.08';
+    } else {
+      el.classList.remove('hidden-unit');
+      el.style.opacity = (u.id === 'u05' && !showHidden) ? '0.45' : '1';
+    }
   });
 }
 
@@ -2918,8 +3030,17 @@ function startSupNight() {
   buildSupMap();
   renderSupUnits();
   const da = $('supDoorABtn'), db = $('supDoorBBtn');
-  if (da) da.textContent = 'PUERTA A · ABIERTA';
-  if (db) db.textContent = 'PUERTA B · ABIERTA';
+  if (da) { da.textContent = 'PUERTA A · ABIERTA'; da.style.borderColor = ''; da.style.color = ''; }
+  if (db) { db.textContent = 'PUERTA B · ABIERTA'; db.style.borderColor = ''; db.style.color = ''; }
+  let prev = $('supCamPreview');
+  if (!prev) {
+    prev = document.createElement('div');
+    prev.id = 'supCamPreview';
+    prev.className = 'sup-cam-preview';
+    prev.textContent = 'Cámara: —';
+    const map = $('supMapWrap');
+    if (map && map.parentNode) map.parentNode.insertBefore(prev, map.nextSibling);
+  }
   playSupMusic('calm');
   const wrap = $('supScreen');
   if (wrap) wrap.classList.remove('horror');
@@ -2947,25 +3068,51 @@ function renderSupHud() {
   const sec = String(t % 60).padStart(2, '0');
   const st = $('supTime');
   if (st) st.textContent = mm + ':' + sec;
-  const pw = $('supPower');
-  if (pw) pw.textContent = Math.max(0, Math.floor(supState.power)) + '%';
   const da = $('supDoorABtn'), db = $('supDoorBBtn');
   if (da) {
-    da.textContent = supState.doorA ? 'PUERTA A · CERRADA' : 'PUERTA A · ABIERTA';
-    da.style.borderColor = supState.doorA ? '#c04040' : '';
-    da.style.color = supState.doorA ? '#ff9090' : '';
+    if (supState.doorABroken) {
+      da.textContent = 'PUERTA A · FALLO';
+      da.style.borderColor = '#c9a227'; da.style.color = '#e8c44a';
+    } else {
+      da.textContent = supState.doorA ? 'PUERTA A · CERRADA' : 'PUERTA A · ABIERTA';
+      da.style.borderColor = supState.doorA ? '#c04040' : '';
+      da.style.color = supState.doorA ? '#ff9090' : '';
+    }
   }
   if (db) {
-    db.textContent = supState.doorB ? 'PUERTA B · CERRADA' : 'PUERTA B · ABIERTA';
-    db.style.borderColor = supState.doorB ? '#c04040' : '';
-    db.style.color = supState.doorB ? '#ff9090' : '';
+    if (supState.doorBBroken) {
+      db.textContent = 'PUERTA B · FALLO';
+      db.style.borderColor = '#c9a227'; db.style.color = '#e8c44a';
+    } else {
+      db.textContent = supState.doorB ? 'PUERTA B · CERRADA' : 'PUERTA B · ABIERTA';
+      db.style.borderColor = supState.doorB ? '#c04040' : '';
+      db.style.color = supState.doorB ? '#ff9090' : '';
+    }
   }
-  // pintar nodos de puerta en el mapa
+  const pw = $('supPower');
+  if (pw) {
+    if (supState.powerBroken) pw.textContent = '??%';
+    else pw.textContent = Math.max(0, Math.floor(supState.power)) + '%';
+  }
   document.querySelectorAll('.sup-node').forEach(el => {
     const loc = el.dataset.loc;
-    if (loc === 'puertaA') el.classList.toggle('door-closed', !!supState.doorA);
-    if (loc === 'puertaB') el.classList.toggle('door-closed', !!supState.doorB);
+    el.classList.remove('door-closed', 'door-broken', 'scan-target', 'cam-active');
+    if (loc === 'puertaA') {
+      if (supState.doorABroken) el.classList.add('door-broken');
+      else if (supState.doorA) el.classList.add('door-closed');
+    }
+    if (loc === 'puertaB') {
+      if (supState.doorBBroken) el.classList.add('door-broken');
+      else if (supState.doorB) el.classList.add('door-closed');
+    }
+    if (loc === 'puertaC') {
+      if (supState.doorCBroken) el.classList.add('door-broken');
+      else if (supState.doorC) el.classList.add('door-closed');
+    }
+    if (supState.scanTimer > 0 && supState.scanRoom === loc) el.classList.add('scan-target');
+    if (supState.mode === 'cam' && supState.camRoom === loc) el.classList.add('cam-active');
   });
+  updateSupToolsUI();
 }
 
 function supLoop(now) {
@@ -3099,19 +3246,69 @@ function wireUI() {
   on($('supervisorBtn'), 'click', enterSupervisorMode);
   on($('supStartNight'), 'click', startSupNight);
   on($('supAbortBrief'), 'click', exitSupervisorMode);
+  on($('supAbortPlay'), 'click', () => { const m = $('supAbortModal'); if (m) m.classList.add('open'); });
+  on($('supAbortYes'), 'click', () => { const m = $('supAbortModal'); if (m) m.classList.remove('open'); exitSupervisorMode(); });
+  on($('supAbortNo'), 'click', () => { const m = $('supAbortModal'); if (m) m.classList.remove('open'); });
+
   on($('supAbortPlay'), 'click', () => { if (supRaf) cancelAnimationFrame(supRaf); exitSupervisorMode(); });
   on($('supExit'), 'click', exitSupervisorMode);
   on($('supNext'), 'click', supContinue);
   on($('supChatSend'), 'click', sendSupChat);
   on($('supChatInput'), 'keydown', e => { if (e.key === 'Enter') sendSupChat(); });
   on($('supDoorABtn'), 'click', () => {
-    if (!supState || (supState.power <= 0 && !supState.doorA)) return;
+    if (!supState) return;
+    if (supState.doorABroken) { showSysMsg('PUERTA A EN FALLO — REPARA', 1800, true); return; }
+    if (supState.powerBroken) { showSysMsg('ENERGÍA EN FALLO', 1800, true); return; }
+    if (supState.power <= 0 && !supState.doorA) return;
     supState.doorA = !supState.doorA;
     renderSupHud();
   });
   on($('supDoorBBtn'), 'click', () => {
-    if (!supState || (supState.power <= 0 && !supState.doorB)) return;
+    if (!supState) return;
+    if (supState.doorBBroken) { showSysMsg('PUERTA B EN FALLO — REPARA', 1800, true); return; }
+    if (supState.powerBroken) { showSysMsg('ENERGÍA EN FALLO', 1800, true); return; }
+    if (supState.power <= 0 && !supState.doorB) return;
     supState.doorB = !supState.doorB;
+    renderSupHud();
+  });
+  on($('supScanBtn'), 'click', () => {
+    if (!supState) return;
+    supState.mode = supState.mode === 'scan' ? 'none' : 'scan';
+    if (supState.mode === 'scan') appendSupLog('supPlayLog', 'ESCANEO: elige una zona en el mapa.', 'sys');
+    updateSupToolsUI();
+  });
+  on($('supCamBtn'), 'click', () => {
+    if (!supState) return;
+    supState.mode = supState.mode === 'cam' ? 'none' : 'cam';
+    if (supState.mode === 'cam') appendSupLog('supPlayLog', 'CÁMARAS: elige una habitación.', 'sys');
+    updateSupToolsUI();
+  });
+  on($('supVentBtn'), 'click', () => {
+    if (!supState) return;
+    supState.mapLayer = supState.mapLayer === 'vent' ? 'main' : 'vent';
+    // toggle puerta C if on vent - show status
+    buildSupMap();
+    renderSupUnits();
+    if (supState.mapLayer === 'vent') {
+      appendSupLog('supPlayLog', 'Mapa de CONDUCTOS. Una sola puerta: CONDUCTO.', 'sys');
+    } else {
+      appendSupLog('supPlayLog', 'Mapa principal.', 'sys');
+    }
+    updateSupToolsUI();
+    renderSupHud();
+  });
+  on($('supRepairBtn'), 'click', () => {
+    if (!supState) return;
+    let fixed = [];
+    if (supState.doorABroken) { TSSupervisor.repair(supState, 'doorA'); fixed.push('Puerta A'); }
+    if (supState.doorBBroken) { TSSupervisor.repair(supState, 'doorB'); fixed.push('Puerta B'); }
+    if (supState.doorCBroken) { TSSupervisor.repair(supState, 'doorC'); fixed.push('Conducto'); }
+    if (supState.powerBroken) { TSSupervisor.repair(supState, 'power'); fixed.push('Energía'); }
+    if (!fixed.length) showSysMsg('NADA QUE REPARAR', 1400);
+    else {
+      appendSupLog('supPlayLog', 'Reparación: ' + fixed.join(', '), 'sys');
+      showSysMsg('REPARADO', 1400);
+    }
     renderSupHud();
   });
   // legacy no-op keep parse if any
