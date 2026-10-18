@@ -621,6 +621,19 @@ body{background:var(--bg)!important;color:var(--text)}
 #officeLog .logline.system{color:var(--green)}
 .troop-card.in-deck{outline:1px solid color-mix(in srgb,var(--green) 40%,transparent)}
 
+
+.sup-abort-row{margin-top:12px;margin-bottom:8px}
+.sup-chat-log.noscroll{max-height:none!important;overflow:hidden!important;min-height:72px}
+.sup-comm{max-height:none!important;overflow:visible}
+.sup-cam-view{border:1px solid var(--border);background:#050806;padding:16px;text-align:center;margin-bottom:8px}
+.sup-cam-title{letter-spacing:.14em;color:var(--green);font-size:12px}
+.sup-door-row .button.broken{border-color:#c9a227!important;color:#e8c44a!important}
+.repair-opt.broken{border-color:#c9a227!important;color:#e8c44a!important}
+.repair-opt:disabled{opacity:.4}
+.sup-play-locked .sup-actions,
+.sup-play-locked .sup-map-wrap,
+.sup-play-locked .sup-chat-input{pointer-events:none;opacity:.55}
+
 </style>
 </head>
 <body>
@@ -630,7 +643,7 @@ body{background:var(--bg)!important;color:var(--text)}
   <div class="ag-sub">El navegador bloquea el sonido hasta un toque. Después la música arranca sola.</div>
 </div>
 
-<div class="version-badge" id="versionBadge">v1.0</div>
+<div class="version-badge" id="versionBadge">v1.1</div>
 <div class="noise" id="noise"></div>
 <div class="scanline-extra" id="scanExtra"></div>
 <div class="vignette-pulse" id="vignette"></div>
@@ -638,6 +651,26 @@ body{background:var(--bg)!important;color:var(--text)}
 <div class="sysmsg" id="sysmsg"></div>
 
 
+<div class="modal-bg" id="supRepairModal" role="dialog">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-head"><h3>◈ REPARACIÓN</h3></div>
+    <div class="modal-body">
+      <p class="hint" id="supRepairHint">Elige qué reparar. Mientras avanza la barra no podrás actuar.</p>
+      <div class="row" style="flex-direction:column;gap:8px">
+        <button type="button" class="button repair-opt" id="repDoorA">Reparar Puerta A</button>
+        <button type="button" class="button repair-opt" id="repDoorB">Reparar Puerta B</button>
+        <button type="button" class="button repair-opt" id="repDoorC">Reparar Conducto</button>
+        <button type="button" class="button repair-opt" id="repPower">Reparar Energía</button>
+      </div>
+      <div id="supRepairProgress" style="display:none;margin-top:14px">
+        <div class="tiny" id="supRepairLabel">Reparando…</div>
+        <div class="cont-bar" style="margin-top:6px"><i id="supRepairFill" style="width:0%"></i></div>
+        <div class="tiny" id="supRepairPct">0%</div>
+      </div>
+    </div>
+    <div class="modal-foot"><div class="close-row"><button type="button" class="button" id="supRepairClose">CERRAR</button></div></div>
+  </div>
+</div>
 <div class="modal-bg" id="supAbortModal" role="dialog">
   <div class="modal" style="max-width:360px">
     <div class="modal-head"><h3 style="color:#ff9090">⚠ ABORTAR SESIÓN</h3></div>
@@ -746,7 +779,7 @@ body{background:var(--bg)!important;color:var(--text)}
       <div class="close-row">
         <button type="button" class="button" id="settingsClose">CERRAR</button>
       </div>
-      <p class="version-in" id="settingsVersion">v1.0</p>
+      <p class="version-in" id="settingsVersion">v1.1</p>
     </div>
   </div>
 </div>
@@ -1128,10 +1161,24 @@ body{background:var(--bg)!important;color:var(--text)}
           <div class="sup-units" id="supUnitsLayer"></div>
         </div>
 
+        <div class="sup-cam-view" id="supCamView" style="display:none">
+          <div class="sup-cam-title" id="supCamTitle">CÁMARA</div>
+          <div class="sup-cam-face face-frame lg" id="supCamFace" style="margin:12px auto">
+            <div class="ff-scan"></div>
+            <div class="ff-eyes" id="supCamEyes">· ·</div>
+            <div class="ff-mouth" id="supCamMouth">─</div>
+          </div>
+          <p class="sub" id="supCamText" style="text-align:center">Vacío.</p>
+          <div class="controls"><button class="button" id="supCamExit">VOLVER AL MAPA</button></div>
+        </div>
+
         <div class="sup-actions">
-          <div class="sup-door-row">
+          <div class="sup-door-row" id="supDoorRowMain">
             <button class="button" id="supDoorABtn">PUERTA A · ABIERTA</button>
             <button class="button" id="supDoorBBtn">PUERTA B · ABIERTA</button>
+          </div>
+          <div class="sup-door-row" id="supDoorRowVent" style="display:none">
+            <button class="button" id="supDoorCBtn">CONDUCTO · ABIERTO</button>
           </div>
           <div class="sup-tool-row">
             <button class="button" id="supScanBtn">ESCANEAR</button>
@@ -1139,7 +1186,7 @@ body{background:var(--bg)!important;color:var(--text)}
             <button class="button" id="supVentBtn">CONDUCTOS</button>
             <button class="button" id="supRepairBtn">REPARAR</button>
           </div>
-          <p class="tiny" id="supStatusLine" style="text-align:center;margin:4px 0">Mapa principal · modo normal</p>
+          <p class="tiny" id="supStatusLine" style="text-align:center;margin:4px 0">Mapa principal</p>
         </div>
 
         <div class="sup-comm" id="supComm">
@@ -1151,13 +1198,13 @@ body{background:var(--bg)!important;color:var(--text)}
             </div>
             <div class="sup-comm-title">SUPERVISOR · CANAL ABIERTO</div>
           </div>
-          <div class="sup-chat-log" id="supPlayLog"></div>
+          <div class="sup-chat-log noscroll" id="supPlayLog"></div>
           <div class="sup-chat-input">
             <input type="text" id="supChatInput" placeholder="Escribe al Supervisor…" maxlength="120" autocomplete="off">
             <button class="button" id="supChatSend">ENVIAR</button>
           </div>
         </div>
-        <div class="controls" style="margin-top:10px">
+        <div class="controls sup-abort-row">
           <button class="button" id="supAbortPlay" style="border-color:#6a3030;color:#ff9090">ABORTAR SESIÓN</button>
         </div>
       </div>
@@ -1253,13 +1300,13 @@ body{background:var(--bg)!important;color:var(--text)}
   </footer>
 </main>
 
-<script src="js/cards.js?v=1.0"></script>
-<script src="js/contingency.js?v=1.0"></script>
-<script src="js/units.js?v=1.0"></script>
-<script src="js/supervisor.js?v=1.0"></script>
-<script src="js/minigames.js?v=1.0"></script>
-<script src="js/documents.js?v=1.0"></script>
-<script src="js/questions.js?v=1.0"></script>
-<script src="js/app.js?v=1.0"></script>
+<script src="js/cards.js?v=1.1"></script>
+<script src="js/contingency.js?v=1.1"></script>
+<script src="js/units.js?v=1.1"></script>
+<script src="js/supervisor.js?v=1.1"></script>
+<script src="js/minigames.js?v=1.1"></script>
+<script src="js/documents.js?v=1.1"></script>
+<script src="js/questions.js?v=1.1"></script>
+<script src="js/app.js?v=1.1"></script>
 </body>
 </html>
