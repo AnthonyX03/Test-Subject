@@ -491,6 +491,38 @@ body{background:var(--bg)!important;color:var(--text)}
 .cont-energy{font-size:12px;letter-spacing:.1em;color:var(--green);text-align:center}
 .pack-item{border:1px solid var(--border);padding:12px;margin-bottom:8px;background:#07100a}
 
+
+.deck-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+@media(max-width:640px){.deck-cols{grid-template-columns:1fr}}
+.troop-grid{display:flex;flex-wrap:wrap;gap:8px;max-height:28vh;overflow-y:auto;padding:4px;border:1px solid var(--border);background:#050806;min-height:80px}
+.troop-card{width:120px;border:1px solid var(--border);background:#07100a;padding:8px;cursor:pointer;display:flex;gap:8px;align-items:flex-start;text-align:left}
+.troop-card:hover{border-color:var(--green)}
+.troop-card.dim{opacity:.4}
+.troop-card.in-deck{border-color:#3a6a45}
+.troop-card.r-uncommon{border-color:#4a8a6a}
+.troop-card.r-rare{border-color:#6a8ac0}
+.troop-card.r-epic{border-color:#b08a40}
+.troop-face{width:36px;height:40px;border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;flex-shrink:0;background:#050806;font-size:10px;color:var(--green)}
+.troop-face .tf-eyes{letter-spacing:.12em}
+.troop-body{min-width:0;flex:1}
+.troop-body .tn{font-size:11px;color:var(--green);letter-spacing:.04em}
+.troop-body .tl{font-size:9px;color:var(--muted)}
+.troop-body .te{font-size:9px;color:var(--text);margin-top:3px;line-height:1.3}
+.cont-hand .troop-card{width:130px}
+.dept-card.active-dept{border-color:var(--green);box-shadow:0 0 12px color-mix(in srgb,var(--green) 25%,transparent)}
+
+
+.coll-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:12px 0}
+@media(max-width:520px){.coll-grid{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:521px) and (max-width:700px){.coll-grid{grid-template-columns:repeat(3,1fr)}}
+.coll-cell{border:1px solid var(--border);background:#07100a;padding:8px 6px;text-align:center;cursor:pointer;min-height:88px}
+.coll-cell:hover{border-color:var(--green)}
+.coll-cell.locked{opacity:.35;cursor:default}
+.coll-cell .cf{width:40px;height:44px;margin:0 auto 6px;border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:var(--green);background:#050806}
+.coll-cell .cn{font-size:10px;letter-spacing:.04em;color:var(--green)}
+.coll-cell.locked .cn{color:var(--muted)}
+.coll-pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px;font-size:12px;letter-spacing:.1em;color:var(--muted)}
+
 </style>
 </head>
 <body>
@@ -500,7 +532,7 @@ body{background:var(--bg)!important;color:var(--text)}
   <div class="ag-sub">El navegador bloquea el sonido hasta un toque. Después la música arranca sola.</div>
 </div>
 
-<div class="version-badge" id="versionBadge">v9.0</div>
+<div class="version-badge" id="versionBadge">v9.2</div>
 <div class="noise" id="noise"></div>
 <div class="scanline-extra" id="scanExtra"></div>
 <div class="vignette-pulse" id="vignette"></div>
@@ -512,7 +544,7 @@ body{background:var(--bg)!important;color:var(--text)}
   <div class="modal" style="max-width:520px">
     <div class="modal-head"><h3>◈ DEPARTAMENTOS U.E.C.</h3></div>
     <div class="modal-body">
-      <p class="hint" style="margin-bottom:10px">Elige sector. Cada departamento tiene su propio protocolo de entrada.</p>
+      <p class="hint" style="margin-bottom:10px">Elige sector. Cambia el texto de la intro y el botón INICIAR. No cierra el menú principal.</p>
       <div class="dept-grid">
         <div class="dept-card" id="deptInvest">
           <div class="dc-title">INVESTIGACIÓN</div>
@@ -546,12 +578,22 @@ body{background:var(--bg)!important;color:var(--text)}
 <div class="cont-screen" id="contScreen">
   <div id="contLobby">
     <h2 style="letter-spacing:.14em;color:var(--green);font-size:16px">CONTINGENCIA</h2>
-    <p class="sub">Elige unidad a contener. Vacía su integridad con cartas de tropa.</p>
-    <div class="cont-select" id="contUnitSelect"></div>
+    <p class="sub" id="contTargetLabel">Objetivo: —</p>
+    <p class="hint">La Unidad objetivo es la que tengas activa (botón UNIDADES). Aquí montas el mazo.</p>
     <p class="cont-energy" id="contDeckInfo">Mazo: —</p>
-    <div class="controls">
-      <button class="button" id="contStartBtn">INICIAR CONTENCIÓN</button>
-      <button class="button" id="contBackBtn">VOLVER</button>
+    <div class="deck-cols">
+      <div>
+        <h4 style="letter-spacing:.12em;color:var(--green);font-size:11px">MAZO DE COMBATE <span class="tiny">(toca para quitar)</span></h4>
+        <div class="troop-grid" id="contDeckList"></div>
+      </div>
+      <div>
+        <h4 style="letter-spacing:.12em;color:var(--muted);font-size:11px">RESERVA <span class="tiny">(toca para añadir)</span></h4>
+        <div class="troop-grid" id="contReserveList"></div>
+      </div>
+    </div>
+    <div class="controls" style="margin-top:12px">
+      <button class="button" id="contStartBtn">EMPEZAR COMBATE →</button>
+      <button class="button" id="contBackBtn">VOLVER AL MENÚ</button>
     </div>
   </div>
   <div id="contBattle" style="display:none">
@@ -568,9 +610,10 @@ body{background:var(--bg)!important;color:var(--text)}
       <div class="cont-bar-wrap"><div class="label" id="contEName">UNIDAD</div><div class="cont-bar enemy" id="contEBar"><i id="contEFill"></i></div><div class="tiny" id="contEHP">—</div></div>
     </div>
     <div class="cont-log" id="contLog"></div>
+    <p class="hint" id="contHint" style="text-align:center">Toca una tropa para enviarla.</p>
     <div class="cont-hand" id="contHand"></div>
     <div class="cont-actions">
-      <button class="button" id="contEndTurn">FIN DE TURNO</button>
+      <button class="button" id="contEndTurn">FIN DE TURNO (la Unidad responde)</button>
       <button class="button" id="contFlee" style="border-color:#6a3030;color:#ff9090">ABORTAR</button>
     </div>
   </div>
@@ -644,7 +687,7 @@ body{background:var(--bg)!important;color:var(--text)}
       <div class="close-row">
         <button type="button" class="button" id="settingsClose">CERRAR</button>
       </div>
-      <p class="version-in" id="settingsVersion">v9.0</p>
+      <p class="version-in" id="settingsVersion">v9.2</p>
     </div>
   </div>
 </div>
@@ -689,6 +732,39 @@ body{background:var(--bg)!important;color:var(--text)}
 </div>
 
 
+
+<div class="modal-bg" id="collectionModal" role="dialog">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-head"><h3>◈ COLECCIÓN DE TROPAS</h3></div>
+    <div class="modal-body">
+      <p class="hint" id="collectionMeta">0 / 210 desbloqueadas</p>
+      <div class="coll-grid" id="collectionGrid"></div>
+      <div class="coll-pager">
+        <button type="button" class="button" id="collPrev">← ANT</button>
+        <span id="collPageLabel">1 / 1</span>
+        <button type="button" class="button" id="collNext">SIG →</button>
+      </div>
+    </div>
+    <div class="modal-foot"><div class="close-row"><button type="button" class="button" id="collectionClose">CERRAR</button></div></div>
+  </div>
+</div>
+<div class="modal-bg" id="troopDetailModal" role="dialog">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-head"><h3 id="troopDetailTitle">◈ TROPA</h3></div>
+    <div class="modal-body" style="text-align:center">
+      <div class="face-frame lg" id="troopDetailFace" style="margin:0 auto 14px">
+        <div class="ff-scan"></div>
+        <div class="ff-eyes" id="troopDetailEyes">• •</div>
+        <div class="ff-mouth" id="troopDetailMouth">─</div>
+      </div>
+      <div class="dtitle" id="troopDetailRole" style="margin-bottom:8px"></div>
+      <div class="price" id="troopDetailEffect" style="margin-bottom:12px"></div>
+      <div class="ending-lore" id="troopDetailLore" style="text-align:left;max-height:30vh"></div>
+    </div>
+    <div class="modal-foot"><div class="close-row"><button type="button" class="button" id="troopDetailClose">CERRAR</button></div></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="extraModal" role="dialog" aria-modal="true" aria-label="Extra">
   <div class="modal">
     <div class="modal-head"><h3>◈ EXTRA</h3></div>
@@ -714,6 +790,13 @@ body{background:var(--bg)!important;color:var(--text)}
           <button type="button" class="button" id="openMgBtn">MINIJUEGOS</button>
         </div>
         <p class="hint">Se desbloquean al superarlos en una entrevista. Aquí se practican sin CE.</p>
+      </section>
+      <section>
+        <h4>CONTINGENCIA</h4>
+        <div class="row">
+          <button type="button" class="button" id="openCollectionBtn">COLECCIÓN</button>
+        </div>
+        <p class="hint">Tropas conseguidas en sobres y recompensas. 10 por página.</p>
       </section>
     </div>
     <div class="modal-foot">
@@ -822,12 +905,12 @@ body{background:var(--bg)!important;color:var(--text)}
         <span style="color:#4a6a52;font-size:11px">Sesión local. Sin servidor central. Cada evaluación elige 20 preguntas de un banco amplio. Si vuelves, es posible que recuerde ecos de lo que dijiste.</span>
       </p>
       <div class="controls">
-        <button class="button" id="deptBtn">DEPARTAMENTOS →</button>
+        <button class="button" id="startBtn">INICIAR EVALUACIÓN →</button>
+        <button class="button" id="deptBtn">DEPARTAMENTOS</button>
         <button class="button" id="introEndingsBtn">FINALES <span id="endingCountIntro">(0)</span></button>
         <button class="button" id="introUnitsBtn">UNIDADES</button>
         <button class="button" id="introExtraBtn">EXTRA</button>
         <button class="button" id="settingsOpen2">⚙ AJUSTES</button>
-        <button class="button" id="supervisorBtn" style="display:none">MODO SUPERVISOR</button>
       </div>
       <p class="tiny" id="introMeta">
         DURACIÓN EST. 14–20 MIN · 20 PREGUNTAS · DOCUMENTOS OCULTOS<br>
@@ -962,13 +1045,13 @@ body{background:var(--bg)!important;color:var(--text)}
   </footer>
 </main>
 
-<script src="js/cards.js?v=9.0"></script>
-<script src="js/contingency.js?v=9.0"></script>
-<script src="js/units.js?v=9.0"></script>
-<script src="js/supervisor.js?v=9.0"></script>
-<script src="js/minigames.js?v=9.0"></script>
-<script src="js/documents.js?v=9.0"></script>
-<script src="js/questions.js?v=9.0"></script>
-<script src="js/app.js?v=9.0"></script>
+<script src="js/cards.js?v=9.2"></script>
+<script src="js/contingency.js?v=9.2"></script>
+<script src="js/units.js?v=9.2"></script>
+<script src="js/supervisor.js?v=9.2"></script>
+<script src="js/minigames.js?v=9.2"></script>
+<script src="js/documents.js?v=9.2"></script>
+<script src="js/questions.js?v=9.2"></script>
+<script src="js/app.js?v=9.2"></script>
 </body>
 </html>
